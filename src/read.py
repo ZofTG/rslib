@@ -1,4 +1,4 @@
-"""input-output module"""
+"""special files reading module"""
 
 
 #! IMPORTS
@@ -12,7 +12,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-__all__ = ["read_tdf"]
+__all__ = ["tdf"]
 
 
 #! BTS BIOENGINEERING
@@ -75,23 +75,23 @@ def _read_tracks(
 
         # read data
         if by_frame:
-            n = size * n_tracks * n_frames
-            segments = struct.unpack("%if" % n, fid.read(n * 4))
+            nsamp = size * n_tracks * n_frames
+            segments = struct.unpack("%if" % nsamp, fid.read(nsamp * 4))
             tracks = np.array(segments)
             tracks = tracks.reshape(n_frames, size * n_tracks).T
 
         # read by track
         else:
-            n = struct.unpack("i", fid.read(4))[0]
+            nsamp = struct.unpack("i", fid.read(4))[0]
             fid.seek(4, 1)
-            segments = struct.unpack(f"{2 * n}i", fid.read(8 * n))
-            segments = np.array(segments).reshape(n, 2).T
+            segments = struct.unpack(f"{2 * nsamp}i", fid.read(8 * nsamp))
+            segments = np.array(segments).reshape(nsamp, 2).T
             cols = np.atleast_2d(np.arange(size) + size * trk)
-            for s in np.arange(n):
-                for r in np.arange(segments[1, s]) + segments[0, s]:
+            for samp in np.arange(nsamp):
+                for rng in np.arange(segments[1, samp]) + segments[0, samp]:
                     vals = fid.read(4 * size)
-                    if r < tracks.shape[0]:
-                        tracks[r, cols] = struct.unpack(f"{size}f", vals)
+                    if rng < tracks.shape[0]:
+                        tracks[rng, cols] = struct.unpack(f"{size}f", vals)
 
     # return the tracks
     return tracks, labels
@@ -124,9 +124,9 @@ def _read_point3d(
     frames, freq, time, n_tracks = struct.unpack("iifi", fid.read(16))
 
     # calibration data (read but not exported)
-    A = np.array(struct.unpack("3f", fid.read(12)))
-    B = np.array(struct.unpack("9f", fid.read(36))).reshape(3, 3).T
-    C = np.array(struct.unpack("3f", fid.read(12)))
+    _ = np.array(struct.unpack("3f", fid.read(12)))
+    _ = np.array(struct.unpack("9f", fid.read(36))).reshape(3, 3).T
+    _ = np.array(struct.unpack("3f", fid.read(12)))
     fid.seek(4, 1)
 
     # check if links exists
@@ -188,9 +188,9 @@ def _read_force3d(
     n_tracks, freq, time, frames = struct.unpack("iifi", fid.read(16))
 
     # calibration data (read but not exported)
-    A = np.array(struct.unpack("3f", fid.read(12)))
-    B = np.array(struct.unpack("9f", fid.read(36))).reshape(3, 3).T
-    C = np.array(struct.unpack("3f", fid.read(12)))
+    _ = np.array(struct.unpack("3f", fid.read(12)))
+    _ = np.array(struct.unpack("9f", fid.read(36))).reshape(3, 3).T
+    _ = np.array(struct.unpack("3f", fid.read(12)))
     fid.seek(4, 1)
 
     # check if the file has to be read by frame or by track
@@ -286,7 +286,8 @@ def _read_imu(
     """
     # check if the file has to be read by frame or by track
     if not info["Format"] in [5]:
-        raise IOError("Invalid 'Format' info {}".format(info["Format"]))
+        formatted = info["Format"]
+        raise IOError(f"Invalid 'Format' info {formatted}")
 
     # get the file read
     fid.seek(info["Offset"], 0)
@@ -315,9 +316,8 @@ def _read_imu(
     return imus
 
 
-def read_tdf(
+def tdf(
     path: str,
-    as_dict: bool = True,
 ):
     """
     Return the readings from a .tdf file as dicts of 3D objects.
@@ -326,10 +326,6 @@ def read_tdf(
     ----------
     path: str
         an existing tdf path.
-
-    as_dict:bool
-        if true, the data is returned as dict where each key is a specific
-        data type (e.g. point3d, force3d)
 
     Returns
     -------
@@ -353,7 +349,7 @@ def read_tdf(
     try:
         # check the signature
         sig = struct.unpack("IIII", fid.read(16))
-        sig = "".join(["{:08x}".format(b) for b in sig])
+        sig = "".join([f"{b:08x}" for b in sig])
         if sig != tdf_signature.lower():
             raise IOError("invalid file")
 
@@ -379,45 +375,39 @@ def read_tdf(
             # get the data types
             block_info = struct.unpack("IIii", fid.read(16))
             block_labels = ["Type", "Format", "Offset", "Size"]
-            bi = dict(zip(block_labels, block_info))
+            block_index = dict(zip(block_labels, block_info))
 
             # retain only valid block types
-            if bi["Type"] in list(ids.values()):
-                blocks += [bi]
+            if block_index["Type"] in list(ids.values()):
+                blocks += [block_index]
 
             # update the offset
             next_entry_offset = 272
 
         # read the available data
-        for b in blocks:
-            if b["Type"] == ids["Point3D"]:
-                points, links = _read_point3d(fid, b)
-            elif b["Type"] == ids["ForcePlatform3D"]:
-                forceplatforms = _read_force3d(fid, b)
-            elif b["Type"] == ids["EmgChannel"]:
-                emgchannels = _read_emg(fid, b)
-            elif b["Type"] == ids["EmgChannel"]:
-                imus = _read_imu(fid, b)
+        for block in blocks:
+            if block["Type"] == ids["Point3D"]:
+                points, links = _read_point3d(fid, block)
+            elif block["Type"] == ids["ForcePlatform3D"]:
+                forceplatforms = _read_force3d(fid, block)
+            elif block["Type"] == ids["EmgChannel"]:
+                emgchannels = _read_emg(fid, block)
+            elif block["Type"] == ids["EmgChannel"]:
+                imus = _read_imu(fid, block)
 
     finally:
         fid.close()
 
-    # prepare the output
-    dct = {
+    return {
         "point3d": points,
         "link": links,
         "force3d": forceplatforms,
         "emg": emgchannels,
         "imu": imus,
     }
-    if as_dict:
-        return dct
-
-    # convert to a single dataframe if required
-    out = pd.DataFrame()
-    for key, values in dct.items():
-
-
 
 
 #! OPENSIM
+
+
+# TODO
