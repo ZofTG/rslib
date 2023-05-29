@@ -1,5 +1,5 @@
-"""init module"""
+"""pylab initialization module"""
 
-from .read import *
+from .io import *
 from .signalprocessing import *
 from .utils import *
