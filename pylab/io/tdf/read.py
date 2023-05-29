@@ -867,13 +867,10 @@ def _data_platforms(
             lbls = [f"track{trk + 1}" for trk in np.arange(ntracks)]
 
         # get the available data
-        data = np.nan * np.ones(
-            nframes,
-            ntracks,
-        )
-        nsamp = nchannels * ntracks * nframes
+        data = np.nan * np.ones(nframes, ntracks, nchns)
+        nsamp = nchns * ntracks * nframes
         data = struct.unpack(f"{nsamp}f", fid.read(4 * nsamp))
-        data = np.reshape(data, (ntracks, nframes, nchannels))
+        data = np.reshape(data, (ntracks, nframes, nchns))
 
     # return
     out: dict[str, np.ndarray[Any, np.dtype[np.float_]]] = dict(zip(lbls, data))
