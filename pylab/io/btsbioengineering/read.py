@@ -213,7 +213,7 @@ def _camera_calibration(
 
     # parameters
     cam_params = []
-    for i in np.arange(cam_n):
+    for _ in np.arange(cam_n):
         if 1 == block["Format"]:  # Seelab type 1 calibration
             params = {
                 "R": np.reshape(struct.unpack("9d", fid.read(72)), (3, 3)),
@@ -706,11 +706,15 @@ def _data_3d(
         msg += " was found."
         raise ValueError(msg)
 
+    # convert the tracks in pandas dataframes
+    idx = np.arange(list(tracks.values())[0].shape[0]) / freq + time0
+    idx = pd.Index(idx, name="TIME [s]")
+    col = pd.MultiIndex.from_product(["X", "Y", "Z"], ["m"])
+    tracks = {i: pd.DataFrame(v, idx, col) for i, v in tracks.items()}
+
     return {
         "TRACKS": tracks,
         "LINKS": links,
-        "FREQUENCY": freq,
-        "TIME0": time0,
         "DIMENSIONS": dims,
         "ROTATION_MATRIX": rmat,
         "TRASLATION": tras,
@@ -757,11 +761,16 @@ def _data_emg(
         msg += " was found."
         raise ValueError(msg)
 
+    # convert the tracks in a single pandas dataframe
+    tracks = pd.DataFrame(tracks)
+    col = pd.MultiIndex.from_product(tracks.columns.to_numpy(), ["V"])
+    tracks.columns = col
+    idx = pd.Index(np.arange(tracks.shape[0]) / freq + time0, name="TIME [s]")
+    tracks.index = idx
+
     return {
         "TRACKS": tracks,
         "CHANNELS": chn_map,
-        "FREQUENCY": freq,
-        "TIME0": time0,
     }
 
 
@@ -805,11 +814,16 @@ def _data_generic(
         msg += " was found."
         raise ValueError(msg)
 
+    # convert the tracks in a single pandas dataframe
+    tracks = pd.DataFrame(tracks)
+
+    idx = pd.Index(np.arange(tracks.shape[0]) / freq + time0, name="TIME [s]")
+    tracks.index = idx
+    col = pd.MultiIndex.from_product(tracks.columns.to_numpy(), ["V"])
+    tracks.columns = col
     return {
         "TRACKS": tracks,
         "CHANNELS": chn_map,
-        "FREQUENCY": freq,
-        "TIME0": time0,
     }
 
 
@@ -847,7 +861,7 @@ def _data_platforms(
     elif block["Format"] in [5, 6, 7, 8]:
         nchns = 12
     else:
-        msg = f"block['Format'] must be 1, 2, but {block['Format']}"
+        msg = "block['Format'] must be a number in the 1-8 range, "
         msg += " was found."
         raise ValueError(msg)
 
@@ -856,28 +870,26 @@ def _data_platforms(
 
     # get the data
     if block["Format"] in [1, 3, 5, 7]:
-        tracks = _read_tracks(fid, nframes, ntracks, nchns, haslbls)
+        trk = _read_tracks(fid, nframes, ntracks, nchns, haslbls)
     else:  # i.e. block["Format"] in [2, 4, 6, 8]:
         # get the labels
-        if haslbls:
-            lbls = []
-            for trk in np.arange(ntracks):
-                lbls += ["".join(struct.unpack("256B", fid.read(256))).strip()]
-        else:
-            lbls = [f"track{trk + 1}" for trk in np.arange(ntracks)]
+        lbl = []
+        for idx in np.arange(ntracks):
+            if haslbls:
+                lbl += ["".join(struct.unpack("256B", fid.read(256))).strip()]
+            else:
+                lbl = [f"track{idx + 1}"]
 
         # get the available data
-        data = np.nan * np.ones(nframes, ntracks, nchns)
         nsamp = nchns * ntracks * nframes
-        data = struct.unpack(f"{nsamp}f", fid.read(4 * nsamp))
-        data = np.reshape(data, (ntracks, nframes, nchns))
-
-    # return
-    out: dict[str, np.ndarray[Any, np.dtype[np.float_]]] = dict(zip(lbls, data))
-    return out
+        obj = struct.unpack(f"{nsamp}f", fid.read(4 * nsamp))
+        obj = np.reshape(obj, (nframes, ntracks, nchns))
+        obj = np.transpose(obj, axes=[1, 0, 2])
+        trk = dict(zip(lbl, obj))
+        trk: dict[str, np.ndarray[Any, np.dtype[np.float_]]] = trk
 
     return {
-        "TRACKS": tracks,
+        "TRACKS": trk,
         "CHANNELS": chn_map,
         "FREQUENCY": freq,
         "TIME0": time0,
