@@ -816,10 +816,9 @@ def _data_generic(
 
     # convert the tracks in a single pandas dataframe
     tracks = pd.DataFrame(tracks)
-
     idx = pd.Index(np.arange(tracks.shape[0]) / freq + time0, name="TIME [s]")
     tracks.index = idx
-    col = pd.MultiIndex.from_product(tracks.columns.to_numpy(), ["V"])
+    col = pd.MultiIndex.from_product(tracks.columns.to_numpy(), ["-"])
     tracks.columns = col
     return {
         "TRACKS": tracks,
@@ -870,7 +869,7 @@ def _data_platforms(
 
     # get the data
     if block["Format"] in [1, 3, 5, 7]:
-        trk = _read_tracks(fid, nframes, ntracks, nchns, haslbls)
+        tracks = _read_tracks(fid, nframes, ntracks, nchns, haslbls)
     else:  # i.e. block["Format"] in [2, 4, 6, 8]:
         # get the labels
         lbl = []
@@ -885,14 +884,23 @@ def _data_platforms(
         obj = struct.unpack(f"{nsamp}f", fid.read(4 * nsamp))
         obj = np.reshape(obj, (nframes, ntracks, nchns))
         obj = np.transpose(obj, axes=[1, 0, 2])
-        trk = dict(zip(lbl, obj))
-        trk: dict[str, np.ndarray[Any, np.dtype[np.float_]]] = trk
+        tracks = dict(zip(lbl, obj))
+        tracks: dict[str, np.ndarray[Any, np.dtype[np.float_]]] = tracks
+
+    # convert the tracks in a single pandas dataframe
+    cols = ["ORIGIN.X", "ORIGIN.Y"]
+    for trk, obj in tracks.items():
+        idx = pd.Index(np.arange(obj.shape[0]) / freq + time0, name="TIME [s]")
+        col =
+        tracks[trk] = pd.DataFrame(obj)
+    idx = pd.Index(np.arange(tracks.shape[0]) / freq + time0, name="TIME [s]")
+    tracks.index = idx
+    col = pd.MultiIndex.from_product(tracks.columns.to_numpy(), ["-"])
+    tracks.columns = col
 
     return {
-        "TRACKS": trk,
+        "TRACKS": tracks,
         "CHANNELS": chn_map,
-        "FREQUENCY": freq,
-        "TIME0": time0,
     }
 
 
