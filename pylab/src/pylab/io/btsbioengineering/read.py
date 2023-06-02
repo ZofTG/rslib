@@ -25,70 +25,6 @@ _BLOCK_KEYS = ["Type", "Format", "Offset", "Size"]
 #! FUNCTIONS
 
 
-def _open_tdf(
-    path: str,
-):
-    """
-    open a tdf file and return the BufferedReader object, the blocks contained,
-    and the file version.
-
-    Parameters
-    ----------
-    path: str
-        an existing tdf path.
-
-    Returns
-    -------
-    fid: BufferedReader
-        the file stream object
-
-    blocks: list[dict[str, int]]
-        the list of blocks info
-
-    version: int
-        the file version.
-    """
-    tdf_signature = "41604B82CA8411D3ACB60060080C6816"
-    blocks: list[dict[Literal["Type", "Format", "Offset", "Size"], int]] = []
-    next_entry_offset = 40
-    version = float("nan")
-
-    # check the validity of the entered path
-    assert os.path.exists(path), path + " does not exist."
-    assert path[-4:] == ".tdf", path + ' must be an ".tdf" path.'
-
-    # try opening the file
-    fid = open(path, "rb")
-    try:
-        # check the signature
-        sig = struct.unpack("IIII", fid.read(16))
-        sig = "".join([f"{b:08x}" for b in sig])
-        if sig.upper() != tdf_signature:
-            raise IOError("invalid file")
-
-        # get the number of entries
-        version, n_entries = struct.unpack("Ii", fid.read(8))
-        assert n_entries > 0, "The file specified contains no data."
-
-        # check each entry to find the available blocks
-        for _ in range(n_entries):
-            if -1 == fid.seek(next_entry_offset, 1):
-                raise IOError("Error: the file specified is corrupted.")
-
-            # get the data types
-            block_info = struct.unpack("IIii", fid.read(16))
-            if block_info[1] != 0:  # Format != 0 ensures valid blocks
-                blocks += [dict(zip(_BLOCK_KEYS, block_info))]  # type: ignore
-
-            # update the offset
-            next_entry_offset = 272
-
-    except Exception as exc:
-        raise RuntimeError(exc) from exc
-
-    return fid, blocks, int(version)
-
-
 def _get_block(
     fid: BufferedReader,
     blocks: list[dict[Literal["Type", "Format", "Offset", "Size"], int]],
@@ -957,6 +893,79 @@ def _force_3d(
     }
 
 
+def _volume(
+    fid: BufferedReader,
+    blocks: list[dict[Literal["Type", "Format", "Offset", "Size"], int]],
+):
+    """
+    read volumetric data sequence from a tdf file stream.
+
+    Parameters
+    ----------
+    fid : BufferedReader
+        the file stream as returned by the _open_tdf function.
+
+    blocks : list[dict[Literal["Type", "Format", "Offset", "Size"], int]]
+        the list of blocks as returned by the _open_tdf function.
+
+    Returns
+    -------
+    data: dict[str, Any]
+        the available data.
+    """
+
+    # get the generic data
+    fid, block = _get_block(fid, blocks, 13)
+    if len(block) == 0:
+        return None
+    ntracks, freq, time0, nframes = struct.unpack("iifi", fid.read(16))
+
+    # get the data
+    if block["Format"] in [1]:  # by track
+        tracks = {}
+        for _ in np.arange(ntracks):
+            label = "".join(struct.unpack("256B", fid.read(256))).strip()
+
+            # get the available segments
+            nseg = np.array(struct.unpack("i", fid.read(4)))[0]
+            fid.seek(4, 1)
+            nsamp = 2 * nseg
+            segments = struct.unpack(f"{nsamp}i", fid.read(4 * nsamp))
+            segments = np.reshape(segments, (2, nseg))
+
+            # read the data for the actual track
+            arr = np.ones((nframes, 5)) * np.nan
+            for sgm in np.arange(nseg):
+                for frm in np.arange(segments[0, sgm], segments[1, sgm] + 1):
+                    arr[frm] = np.array(struct.unpack("ffffi", fid.read(20)))
+            tracks[label] = arr
+
+    elif block["Format"] in [2]:  # by frame
+        # get the labels
+        labels = []
+        for _ in np.arange(ntracks):
+            labels += ["".join(struct.unpack("256B", fid.read(256))).strip()]
+
+        # get the available data
+        tracks = {i: np.ones((nframes, 5)) * np.nan for i in labels}
+        for frm in np.arange(nframes):
+            for trk in labels:
+                vals = np.array(struct.unpack("ffffi", fid.read(20)))
+                tracks[trk][frm, :] = vals
+
+    else:  # errors
+        msg = f"block['Format'] must be 1, 2, but {block['Format']}"
+        msg += " was found."
+        raise ValueError(msg)
+
+    # convert the tracks in a single pandas dataframe
+    for trk, dfr in tracks.items():
+        idx = pd.Index(np.arange(dfr.shape[0]) / freq + time0, name="TIME [s]")
+        tracks[trk] = pd.DataFrame(dfr, index=idx)
+
+    return tracks
+
+
 def _data_generic(
     fid: BufferedReader,
     blocks: list[dict[Literal["Type", "Format", "Offset", "Size"], int]],
@@ -1091,9 +1100,9 @@ def _events(
             lbl = "".join(struct.unpack("256B", fid.read(256))).strip()
             typ, nit = struct.unpack("ii", fid.read(8))
             data = struct.unpack("f" * nit, fid.read(nit * 4))
-            events[lbl] = {'TYPE': typ, 'DATA': data}
+            events[lbl] = {'TYPE': typ, 'DATA': data, 'TIME0': time0}
 
-    return events, time0
+    return events
 
 
 def read_tdf(
@@ -1112,78 +1121,62 @@ def read_tdf(
     a dict containing the distinct data properly arranged by type.
     """
 
-    # private signature
     tdf_signature = "41604B82CA8411D3ACB60060080C6816"
+    tdf = {}
+    version = float("nan")
 
     # check the validity of the entered path
     assert os.path.exists(path), path + " does not exist."
     assert path[-4:] == ".tdf", path + ' must be an ".tdf" path.'
 
-    # get the tdf
-
-    # check the available data
-    points = {}
-    links = np.atleast_2d([])
-    forceplatforms = {}
-    emgchannels = {}
-    imus = {}
+    # try opening the file
     fid = open(path, "rb")
     try:
         # check the signature
+        blocks: list[dict[Literal["Type", "Format", "Offset", "Size"], int]] = []
+        next_entry_offset = 40
         sig = struct.unpack("IIII", fid.read(16))
         sig = "".join([f"{b:08x}" for b in sig])
-        if sig != tdf_signature.lower():
+        if sig.upper() != tdf_signature:
             raise IOError("invalid file")
 
         # get the number of entries
-        _, n_entries = struct.unpack("Ii", fid.read(8))
+        version, n_entries = struct.unpack("Ii", fid.read(8))
         assert n_entries > 0, "The file specified contains no data."
 
-        # reference indices
-        ids = {
-            "Point3D": 5,
-            "ForcePlatform3D": 12,
-            "EmgChannel": 11,
-            "IMU": 17,
-        }
-
         # check each entry to find the available blocks
-        next_entry_offset = 40
-        blocks = []
         for _ in range(n_entries):
             if -1 == fid.seek(next_entry_offset, 1):
                 raise IOError("Error: the file specified is corrupted.")
 
             # get the data types
             block_info = struct.unpack("IIii", fid.read(16))
-            block_labels = ["Type", "Format", "Offset", "Size"]
-            block_index = dict(zip(block_labels, block_info))
-
-            # retain only valid block types
-            if block_index["Type"] in list(ids.values()):
-                blocks += [block_index]
+            if block_info[1] != 0:  # Format != 0 ensures valid blocks
+                blocks += [dict(zip(_BLOCK_KEYS, block_info))]  # type: ignore
 
             # update the offset
             next_entry_offset = 272
 
-        # read the available data
-        for block in blocks:
-            if block["Type"] == ids["Point3D"]:
-                points, links = _read_point3d(fid, block)
-            elif block["Type"] == ids["ForcePlatform3D"]:
-                forceplatforms = _read_force3d(fid, block)
-            elif block["Type"] == ids["EmgChannel"]:
-                emgchannels = _read_emg(fid, block)
-            elif block["Type"] == ids["EmgChannel"]:
-                imus = _data_imu(fid, block)
+        # read all entries
+        tdf['CAMERA_CALIBRATION'] = _camera_calibration(fid, blocks)
+        tdf['DATA2D_CALIBRATION'] = _data_2d_camera_calibration(fid, blocks)
+        tdf['DATA2D'] = _data_2d(fid, blocks)
+        tdf['DATA3D'] = _data_3d(fid, blocks)
+        tdf['OPTICAL_CONFIGURATION'] = _optical_configuration(fid, blocks)
+        tdf['PLATFORMS_PARAMETERS'] = _platforms_calibration_params(fid, blocks)
+        tdf['PLATFORMS_CALIBRATION'] = _platforms_2d_calibration(fid, blocks)
+        tdf['PLATFORMS_UNTRACKED'] = _data_platforms(fid, blocks)
+        tdf['EMG'] = _emg(fid, blocks)
+        tdf['FORCE3D'] = _force_3d(fid, blocks)
+        tdf['VOLUME'] = _volume(fid, blocks)
+        tdf['DATA_GENERIC'] = _data_generic(fid, blocks)
+        tdf['DATA_GENERIC_CALIBRATION'] = _calibration_generic(fid, blocks)
+        tdf['EVENTS'] = _events(fid, blocks)
+
+    except Exception as exc:
+        raise RuntimeError(exc) from exc
 
     finally:
         fid.close()
 
-    return {
-        "point3d": points,
-        "link": links,
-        "force3d": forceplatforms,
-        "emg": emgchannels,
-        "imu": imus,
-    }
+    return tdf, version
