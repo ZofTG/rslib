@@ -1,4 +1,4 @@
-"""tdf file reading module"""
+"""btsbioengineering files reading module"""
 
 
 __all__ = ["read_tdf"]
@@ -610,7 +610,96 @@ def _data_3d(
     }
 
 
-def _data_2d_platforms_calibration(
+def _optical_configuration(
+    fid: BufferedReader,
+    blocks: list[dict[Literal["Type", "Format", "Offset", "Size"], int]],
+):
+    """
+    read cameras physical configuration from a tdf file stream.
+
+    Parameters
+    ----------
+    fid : BufferedReader
+        the file stream as returned by the _open_tdf function.
+
+    blocks : list[dict[Literal["Type", "Format", "Offset", "Size"], int]]
+        the list of blocks as returned by the _open_tdf function.
+
+    Returns
+    -------
+    data: dict[str, Any]
+        the available data.
+    """
+
+    # get the generic data
+    fid, block = _get_block(fid, blocks, 6)
+    if len(block) == 0:
+        return None
+    nchns = struct.unpack("i", fid.read(4))
+    fid.seek(4, 1)
+
+    # get the data
+    cameras = {}
+    for _ in np.range(nchns):
+        logicalindex = struct.unpack("i", fid.read(4))
+        fid.seek(4, 1)
+        lensname = "".join(struct.unpack("B" * 32, fid.read(32))).strip()
+        camtype = "".join(struct.unpack("B" * 32, fid.read(32))).strip()
+        camname = "".join(struct.unpack("B" * 32, fid.read(32))).strip()
+        viewport = np.reshape(struct.unpack("i" * 4, fid.read(16)), (2, 2))
+        cameras[camname] = {
+            'INDEX': logicalindex,
+            'TYPE': camtype,
+            'LENS': lensname,
+            'VIEWPORT': viewport,
+        }
+
+    return cameras
+
+
+def _platforms_calibration_params(
+    fid: BufferedReader,
+    blocks: list[dict[Literal["Type", "Format", "Offset", "Size"], int]],
+):
+    """
+    read platforms calibration parameters from tdf file.
+
+    Parameters
+    ----------
+    fid : BufferedReader
+        the file stream as returned by the _open_tdf function.
+
+    blocks : list[dict[Literal["Type", "Format", "Offset", "Size"], int]]
+        the list of blocks as returned by the _open_tdf function.
+
+    Returns
+    -------
+    data: dict[str, Any]
+        the available data.
+    """
+
+    # get the generic data
+    fid, block = _get_block(fid, blocks, 7)
+    if len(block) == 0:
+        return None
+    nplats = struct.unpack("i", fid.read(4))
+    fid.seek(4, 1)
+
+    # channels map
+    plat_map = np.array(struct.unpack(f"{nplats}h", fid.read(2 * nplats)))
+
+    # read data for each platform
+    platforms = {}
+    for _ in np.arange(nplats):
+        lbl = "".join(struct.unpack("256B", fid.read(256))).strip()
+        size = list(struct.unpack("ff", fid.read(8)))
+        pos = np.reshape(struct.unpack("12f", fid.read(48)), (3, 4))
+        platforms[lbl] = {'SIZE': size, 'POSITION': pos}
+
+    return platforms
+
+
+def _platforms_2d_calibration(
     fid: BufferedReader,
     blocks: list[dict[Literal["Type", "Format", "Offset", "Size"], int]],
 ):
