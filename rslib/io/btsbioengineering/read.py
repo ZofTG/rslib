@@ -10,7 +10,6 @@ __all__ = ["read_tdf"]
 import os
 import struct
 from io import BufferedReader
-from typing import Any, Literal
 
 import numpy as np
 import pandas as pd
@@ -25,9 +24,28 @@ _BLOCK_KEYS = ["Type", "Format", "Offset", "Size"]
 #! FUNCTIONS
 
 
+def _get_label(
+    obj: bytes,
+):
+    """
+    _get_label convert a bytes string into a readable string
+
+    Parameters
+    ----------
+    obj : bytes
+        the bytes string to te read
+
+    Returns
+    -------
+    label: str
+        the decoded label
+    """
+    return obj.decode("utf-8").replace("\x00", " ").strip()
+
+
 def _get_block(
     fid: BufferedReader,
-    blocks: list[dict[Literal["Type", "Format", "Offset", "Size"], int]],
+    blocks: list[dict[str, int]],
     block_id: int,
 ):
     """
@@ -53,9 +71,12 @@ def _get_block(
         the list of valid blocks
     """
     block = [i for i in blocks if block_id == i["Type"]]
-    if len(block) == 0 or -1 == fid.seek(block[0]["Offset"], 0):
-        fid.close()
-    return fid, block[0]
+    if len(block) > 0:
+        block = block[0]
+        fid.seek(block["Offset"], 0)
+    else:
+        block = {}
+    return fid, block
 
 
 def _read_frames_2d_rts(
@@ -162,13 +183,13 @@ def _read_frames_2d_syn(
     nfeats = struct.unpack(f"{nsamp}h", fid.read(2 * nsamp))
     nfeats = np.reshape(nfeats, shape)
     frames = []
-    for f in np.arange(nframes):
+    for frm in np.arange(nframes):
         frame = []
-        for c in np.arange(ncams):
+        for cam in np.arange(ncams):
             nsamp = 2 * max_feats_n
             tmp_buf = struct.unpack(f"{nsamp}f", fid.read(4 * nsamp))
             tmp_buf = np.reshape(tmp_buf, (2, max_feats_n))
-            frame += [tmp_buf[:, : nfeats[c, f]].tolist()]
+            frame += [tmp_buf[:, : nfeats[cam, frm]].tolist()]
         frames += [frame]
     return frames
 
@@ -210,7 +231,7 @@ def _read_tracks(
     for trk in np.arange(ntracks):
         # get the labels
         if haslabels:
-            lbls += ["".join(struct.unpack("256B", fid.read(256)))]
+            lbls += [_get_label(fid.read(256))]
         else:
             lbls += [f"track{trk + 1}"]
 
@@ -223,13 +244,15 @@ def _read_tracks(
 
         # read the data for the actual track
         for sgm in np.arange(nseg):
-            for frm in np.arange(segments[0, sgm], segments[1, sgm] + 1):
-                vals = fid.read(4 * nchannels)
-                obj[trk, frm] = np.array(struct.unpack("f" * nchannels, vals))
+            frames = np.arange(segments[0, sgm], segments[1, sgm])
+            shape = (len(frames), nchannels)
+            nsamp = int(np.prod(shape))
+            vals = fid.read(4 * nsamp)
+            nums = np.reshape(struct.unpack("f" * nsamp, vals), shape)
+            obj[trk, frames, :] = nums
 
     # split data by track
-    out: dict[str, np.ndarray[Any, np.dtype[np.float_]]] = dict(zip(lbls, obj))
-    return out
+    return dict(zip(lbls, obj))
 
 
 def _read_frames(
@@ -269,7 +292,7 @@ def _read_frames(
     lbls = []
     for trk in np.arange(ntracks):
         if haslabels:
-            label = "".join(struct.unpack("256B", fid.read(256))).strip()
+            label = _get_label(fid.read(256))
         else:
             label = f"track{trk + 1}"
         lbls += [label]
@@ -280,13 +303,12 @@ def _read_frames(
     data = np.reshape(data, (ntracks, nframes, nchannels))
 
     # return
-    out: dict[str, np.ndarray[Any, np.dtype[np.float_]]] = dict(zip(lbls, data))
-    return out
+    return dict(zip(lbls, data))
 
 
 def _camera_calibration(
     fid: BufferedReader,
-    blocks: list[dict[Literal["Type", "Format", "Offset", "Size"], int]],
+    blocks: list[dict[str, int]],
 ):
     """
     read calibration data for general purpose
@@ -296,7 +318,7 @@ def _camera_calibration(
     fid : BufferedReader
         the file stream as returned by the _open_tdf function.
 
-    blocks : list[dict[Literal["Type", "Format", "Offset", "Size"], int]]
+    blocks: list[dict[str, int]],
         the list of blocks as returned by the _open_tdf function.
 
     Returns
@@ -372,7 +394,7 @@ def _camera_calibration(
 
 def _data_2d_camera_calibration(
     fid: BufferedReader,
-    blocks: list[dict[Literal["Type", "Format", "Offset", "Size"], int]],
+    blocks: list[dict[str, int]],
 ):
     """
     read 2D data sequence from a tdf file stream to be used
@@ -383,7 +405,7 @@ def _data_2d_camera_calibration(
     fid : BufferedReader
         the file stream as returned by the _open_tdf function.
 
-    blocks : list[dict[Literal["Type", "Format", "Offset", "Size"], int]]
+    blocks: list[dict[str, int]],
         the list of blocks as returned by the _open_tdf function.
 
     Returns
@@ -429,7 +451,7 @@ def _data_2d_camera_calibration(
 
 def _data_2d(
     fid: BufferedReader,
-    blocks: list[dict[Literal["Type", "Format", "Offset", "Size"], int]],
+    blocks: list[dict[str, int]],
 ):
     """
     read 2D data sequence from a tdf file stream.
@@ -482,7 +504,7 @@ def _data_2d(
 
 def _data_3d(
     fid: BufferedReader,
-    blocks: list[dict[Literal["Type", "Format", "Offset", "Size"], int]],
+    blocks: list[dict[str, int]],
 ):
     """
     read 2D data sequence from a tdf file stream.
@@ -513,11 +535,11 @@ def _data_3d(
 
     # get links
     if block["Format"] in [1, 3]:
-        nlinks = np.array(struct.unpack("i", fid.read(4)))[0]
+        nlinks = struct.unpack("i", fid.read(4))[0]
         fid.seek(4, 1)
         nsamp = 2 * nlinks
         links = struct.unpack(f"{nsamp}i", fid.read(nsamp * 4))
-        links = np.reshape(links, (2, nlinks))
+        links = np.reshape(links, (2, nlinks)).T
     else:
         links = np.array([])
 
@@ -548,7 +570,7 @@ def _data_3d(
 
 def _optical_configuration(
     fid: BufferedReader,
-    blocks: list[dict[Literal["Type", "Format", "Offset", "Size"], int]],
+    blocks: list[dict[str, int]],
 ):
     """
     read cameras physical configuration from a tdf file stream.
@@ -571,23 +593,23 @@ def _optical_configuration(
     fid, block = _get_block(fid, blocks, 6)
     if len(block) == 0:
         return None
-    nchns = struct.unpack("i", fid.read(4))
+    nchns = struct.unpack("i", fid.read(4))[0]
     fid.seek(4, 1)
 
     # get the data
     cameras = {}
-    for _ in np.range(nchns):
+    for _ in np.arange(nchns):
         logicalindex = struct.unpack("i", fid.read(4))
         fid.seek(4, 1)
-        lensname = "".join(struct.unpack("B" * 32, fid.read(32))).strip()
-        camtype = "".join(struct.unpack("B" * 32, fid.read(32))).strip()
-        camname = "".join(struct.unpack("B" * 32, fid.read(32))).strip()
+        lensname = _get_label(fid.read(32))
+        camtype = _get_label(fid.read(32))
+        camname = _get_label(fid.read(32))
         viewport = np.reshape(struct.unpack("i" * 4, fid.read(16)), (2, 2))
         cameras[camname] = {
-            'INDEX': logicalindex,
-            'TYPE': camtype,
-            'LENS': lensname,
-            'VIEWPORT': viewport,
+            "INDEX": logicalindex,
+            "TYPE": camtype,
+            "LENS": lensname,
+            "VIEWPORT": viewport,
         }
 
     return cameras
@@ -595,7 +617,7 @@ def _optical_configuration(
 
 def _platforms_calibration_params(
     fid: BufferedReader,
-    blocks: list[dict[Literal["Type", "Format", "Offset", "Size"], int]],
+    blocks: list[dict[str, int]],
 ):
     """
     read platforms calibration parameters from tdf file.
@@ -605,7 +627,7 @@ def _platforms_calibration_params(
     fid : BufferedReader
         the file stream as returned by the _open_tdf function.
 
-    blocks : list[dict[Literal["Type", "Format", "Offset", "Size"], int]]
+    blocks: list[dict[str, int]],
         the list of blocks as returned by the _open_tdf function.
 
     Returns
@@ -618,7 +640,7 @@ def _platforms_calibration_params(
     fid, block = _get_block(fid, blocks, 7)
     if len(block) == 0:
         return None
-    nplats = struct.unpack("i", fid.read(4))
+    nplats = struct.unpack("i", fid.read(4))[0]
     fid.seek(4, 1)
 
     # channels map
@@ -626,18 +648,18 @@ def _platforms_calibration_params(
 
     # read data for each platform
     platforms = {}
-    for _ in np.arange(nplats):
-        lbl = "".join(struct.unpack("256B", fid.read(256))).strip()
+    for i in np.arange(nplats):
+        lbl = _get_label(fid.read(256))
         size = list(struct.unpack("ff", fid.read(8)))
         pos = np.reshape(struct.unpack("12f", fid.read(48)), (3, 4))
-        platforms[lbl] = {'SIZE': size, 'POSITION': pos}
+        platforms[lbl] = {"SIZE": size, "POSITION": pos, "CHANNEL": plat_map[i]}
 
     return platforms
 
 
 def _platforms_2d_calibration(
     fid: BufferedReader,
-    blocks: list[dict[Literal["Type", "Format", "Offset", "Size"], int]],
+    blocks: list[dict[str, int]],
 ):
     """
     read 2D data sequence from a tdf file stream to be used
@@ -648,7 +670,7 @@ def _platforms_2d_calibration(
     fid : BufferedReader
         the file stream as returned by the _open_tdf function.
 
-    blocks : list[dict[Literal["Type", "Format", "Offset", "Size"], int]]
+    blocks: list[dict[str, int]],
         the list of blocks as returned by the _open_tdf function.
 
     Returns
@@ -684,7 +706,7 @@ def _platforms_2d_calibration(
     platforms = []
     keys = ["LABEL", "FRAMES", "SIZE", "FEATURES"]
     for _ in np.arange(nplats):
-        lbls = " ".join("".join(struct.unpack("32B", fid.read(32))).split("0"))
+        lbls = _get_label(fid.read(32))
         frames = np.array(struct.unpack("i", fid.read(4)))[0]
         size = list(struct.unpack("ff", fid.read(8)))[0]
         feats = read_frames(fid, frames, ncams)
@@ -703,7 +725,7 @@ def _platforms_2d_calibration(
 
 def _data_platforms(
     fid: BufferedReader,
-    blocks: list[dict[Literal["Type", "Format", "Offset", "Size"], int]],
+    blocks: list[dict[str, int]],
 ):
     """
     read generic (untracked) platforms data sequence from a tdf file stream.
@@ -713,7 +735,7 @@ def _data_platforms(
     fid : BufferedReader
         the file stream as returned by the _open_tdf function.
 
-    blocks : list[dict[Literal["Type", "Format", "Offset", "Size"], int]]
+    blocks: list[dict[str, int]],
         the list of blocks as returned by the _open_tdf function.
 
     Returns
@@ -746,12 +768,11 @@ def _data_platforms(
     if block["Format"] in [1, 3, 5, 7]:
         tracks = _read_tracks(fid, nframes, ntracks, nchns, haslbls)
     else:  # i.e. block["Format"] in [2, 4, 6, 8]:
-
         # get the labels
         lbl = []
         for idx in np.arange(ntracks):
             if haslbls:
-                lbl += ["".join(struct.unpack("256B", fid.read(256))).strip()]
+                lbl += [_get_label(fid.read(256))]
             else:
                 lbl = [f"track{idx + 1}"]
 
@@ -761,11 +782,10 @@ def _data_platforms(
         obj = np.reshape(obj, (nframes, ntracks, nchns))
         obj = np.transpose(obj, axes=[1, 0, 2])
         tracks = dict(zip(lbl, obj))
-        tracks: dict[str, np.ndarray[Any, np.dtype[np.float_]]] = tracks
 
     # convert the tracks in a single pandas dataframe
     labels = ["ORIGIN.X", "ORIGIN.Y", "FORCE.X", "FORCE.Y", "FORCE.Z", "TORQUE"]
-    units = ['m', 'm', 'm', 'N', 'N', 'N', 'Nm']
+    units = ["m", "m", "m", "N", "N", "N", "Nm"]
     columns = [[i, j] for i, j in zip(labels, units)]
     for trk, obj in tracks.items():
         idx = pd.Index(np.arange(obj.shape[0]) / freq + time0, name="TIME [s]")
@@ -785,7 +805,7 @@ def _data_platforms(
 
 def _emg(
     fid: BufferedReader,
-    blocks: list[dict[Literal["Type", "Format", "Offset", "Size"], int]],
+    blocks: list[dict[str, int]],
 ):
     """
     read EMG data sequence from a tdf file stream.
@@ -795,7 +815,7 @@ def _emg(
     fid : BufferedReader
         the file stream as returned by the _open_tdf function.
 
-    blocks : list[dict[Literal["Type", "Format", "Offset", "Size"], int]]
+    blocks: list[dict[str, int]],
         the list of blocks as returned by the _open_tdf function.
 
     Returns
@@ -838,7 +858,7 @@ def _emg(
 
 def _force_3d(
     fid: BufferedReader,
-    blocks: list[dict[Literal["Type", "Format", "Offset", "Size"], int]],
+    blocks: list[dict[str, int]],
 ):
     """
     read force 3D data sequence from a tdf file stream.
@@ -848,7 +868,7 @@ def _force_3d(
     fid : BufferedReader
         the file stream as returned by the _open_tdf function.
 
-    blocks : list[dict[Literal["Type", "Format", "Offset", "Size"], int]]
+    blocks: list[dict[str, int]],
         the list of blocks as returned by the _open_tdf function.
 
     Returns
@@ -864,9 +884,9 @@ def _force_3d(
     ntracks, freq, time0, nframes = struct.unpack("iifi", fid.read(16))
 
     # get the calibration data
-    calD = struct.unpack("f" * 3, fid.read(12))
-    calR = np.reshape(struct.unpack("f" * 9, fid.read(36)), (3, 3))
-    calT = struct.unpack("f" * 3, fid.read(12))
+    CAL_D = np.array(struct.unpack("f" * 3, fid.read(12)))
+    CAL_R = np.reshape(struct.unpack("f" * 9, fid.read(36)), (3, 3))
+    CAL_T = np.array(struct.unpack("f" * 3, fid.read(12)))
     fid.seek(4, 1)
 
     # get the data
@@ -887,15 +907,15 @@ def _force_3d(
 
     return {
         "TRACKS": tracks,
-        "DIMENSIONS": calD,
-        "ROTATION_MATRIX": calR,
-        "TRASLATION": calT,
+        "DIMENSIONS": CAL_D,
+        "ROTATION_MATRIX": CAL_R,
+        "TRASLATION": CAL_T,
     }
 
 
 def _volume(
     fid: BufferedReader,
-    blocks: list[dict[Literal["Type", "Format", "Offset", "Size"], int]],
+    blocks: list[dict[str, int]],
 ):
     """
     read volumetric data sequence from a tdf file stream.
@@ -905,7 +925,7 @@ def _volume(
     fid : BufferedReader
         the file stream as returned by the _open_tdf function.
 
-    blocks : list[dict[Literal["Type", "Format", "Offset", "Size"], int]]
+    blocks: list[dict[str, int]],
         the list of blocks as returned by the _open_tdf function.
 
     Returns
@@ -924,7 +944,7 @@ def _volume(
     if block["Format"] in [1]:  # by track
         tracks = {}
         for _ in np.arange(ntracks):
-            label = "".join(struct.unpack("256B", fid.read(256))).strip()
+            label = _get_label(fid.read(256))
 
             # get the available segments
             nseg = np.array(struct.unpack("i", fid.read(4)))[0]
@@ -944,7 +964,7 @@ def _volume(
         # get the labels
         labels = []
         for _ in np.arange(ntracks):
-            labels += ["".join(struct.unpack("256B", fid.read(256))).strip()]
+            labels += [_get_label(fid.read(256))]
 
         # get the available data
         tracks = {i: np.ones((nframes, 5)) * np.nan for i in labels}
@@ -959,16 +979,17 @@ def _volume(
         raise ValueError(msg)
 
     # convert the tracks in a single pandas dataframe
+    obj = {}
     for trk, dfr in tracks.items():
         idx = pd.Index(np.arange(dfr.shape[0]) / freq + time0, name="TIME [s]")
-        tracks[trk] = pd.DataFrame(dfr, index=idx)
+        obj[trk] = pd.DataFrame(dfr, index=idx)
 
-    return tracks
+    return obj
 
 
 def _data_generic(
     fid: BufferedReader,
-    blocks: list[dict[Literal["Type", "Format", "Offset", "Size"], int]],
+    blocks: list[dict[str, int]],
 ):
     """
     read generic data sequence from a tdf file stream.
@@ -978,7 +999,7 @@ def _data_generic(
     fid : BufferedReader
         the file stream as returned by the _open_tdf function.
 
-    blocks : list[dict[Literal["Type", "Format", "Offset", "Size"], int]]
+    blocks: list[dict[str, int]],
         the list of blocks as returned by the _open_tdf function.
 
     Returns
@@ -1020,7 +1041,7 @@ def _data_generic(
 
 def _calibration_generic(
     fid: BufferedReader,
-    blocks: list[dict[Literal["Type", "Format", "Offset", "Size"], int]],
+    blocks: list[dict[str, int]],
 ):
     """
     read calibration data for general purpose
@@ -1030,7 +1051,7 @@ def _calibration_generic(
     fid : BufferedReader
         the file stream as returned by the _open_tdf function.
 
-    blocks : list[dict[Literal["Type", "Format", "Offset", "Size"], int]]
+    blocks: list[dict[str, int]],
         the list of blocks as returned by the _open_tdf function.
 
     Returns
@@ -1065,7 +1086,7 @@ def _calibration_generic(
 
 def _events(
     fid: BufferedReader,
-    blocks: list[dict[Literal["Type", "Format", "Offset", "Size"], int]],
+    blocks: list[dict[str, int]],
 ):
     """
     read generic data sequence from a tdf file stream.
@@ -1075,7 +1096,7 @@ def _events(
     fid : BufferedReader
         the file stream as returned by the _open_tdf function.
 
-    blocks : list[dict[Literal["Type", "Format", "Offset", "Size"], int]]
+    blocks: list[dict[str, int]],
         the list of blocks as returned by the _open_tdf function.
 
     Returns
@@ -1091,16 +1112,16 @@ def _events(
     fid, block = _get_block(fid, blocks, 16)
     if len(block) == 0:
         return None
-    nevents, time0, = struct.unpack("if", fid.read(8))
+    nevents, time0 = struct.unpack("if", fid.read(8))
 
     # read the events
     events = {}
-    if block['Format'] in [1]:
+    if block["Format"] in [1]:
         for _ in np.arange(nevents):
-            lbl = "".join(struct.unpack("256B", fid.read(256))).strip()
+            lbl = _get_label(fid.read(256))
             typ, nit = struct.unpack("ii", fid.read(8))
             data = struct.unpack("f" * nit, fid.read(nit * 4))
-            events[lbl] = {'TYPE': typ, 'DATA': data, 'TIME0': time0}
+            events[lbl] = {"TYPE": typ, "DATA": data, "TIME0": time0}
 
     return events
 
@@ -1133,7 +1154,7 @@ def read_tdf(
     fid = open(path, "rb")
     try:
         # check the signature
-        blocks: list[dict[Literal["Type", "Format", "Offset", "Size"], int]] = []
+        blocks = []
         next_entry_offset = 40
         sig = struct.unpack("IIII", fid.read(16))
         sig = "".join([f"{b:08x}" for b in sig])
@@ -1158,20 +1179,20 @@ def read_tdf(
             next_entry_offset = 272
 
         # read all entries
-        tdf['CAMERA_CALIBRATION'] = _camera_calibration(fid, blocks)
-        tdf['DATA2D_CALIBRATION'] = _data_2d_camera_calibration(fid, blocks)
-        tdf['DATA2D'] = _data_2d(fid, blocks)
-        tdf['DATA3D'] = _data_3d(fid, blocks)
-        tdf['OPTICAL_CONFIGURATION'] = _optical_configuration(fid, blocks)
-        tdf['PLATFORMS_PARAMETERS'] = _platforms_calibration_params(fid, blocks)
-        tdf['PLATFORMS_CALIBRATION'] = _platforms_2d_calibration(fid, blocks)
-        tdf['PLATFORMS_UNTRACKED'] = _data_platforms(fid, blocks)
-        tdf['EMG'] = _emg(fid, blocks)
-        tdf['FORCE3D'] = _force_3d(fid, blocks)
-        tdf['VOLUME'] = _volume(fid, blocks)
-        tdf['DATA_GENERIC'] = _data_generic(fid, blocks)
-        tdf['DATA_GENERIC_CALIBRATION'] = _calibration_generic(fid, blocks)
-        tdf['EVENTS'] = _events(fid, blocks)
+        tdf["CAMERA_CALIBRATION"] = _camera_calibration(fid, blocks)
+        tdf["DATA2D_CALIBRATION"] = _data_2d_camera_calibration(fid, blocks)
+        tdf["DATA2D"] = _data_2d(fid, blocks)
+        tdf["DATA3D"] = _data_3d(fid, blocks)
+        tdf["OPTICAL_CONFIGURATION"] = _optical_configuration(fid, blocks)
+        tdf["PLATFORMS_PARAMETERS"] = _platforms_calibration_params(fid, blocks)
+        tdf["PLATFORMS_CALIBRATION"] = _platforms_2d_calibration(fid, blocks)
+        tdf["PLATFORMS_UNTRACKED"] = _data_platforms(fid, blocks)
+        tdf["EMG"] = _emg(fid, blocks)
+        tdf["FORCE3D"] = _force_3d(fid, blocks)
+        tdf["VOLUME"] = _volume(fid, blocks)
+        tdf["DATA_GENERIC"] = _data_generic(fid, blocks)
+        tdf["DATA_GENERIC_CALIBRATION"] = _calibration_generic(fid, blocks)
+        tdf["EVENTS"] = _events(fid, blocks)
 
     except Exception as exc:
         raise RuntimeError(exc) from exc
