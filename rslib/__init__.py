@@ -1,6 +1,5 @@
-"""pylab initialization module"""
+"""rslib package"""
 
-from . import io
 from .io import *
 from .signalprocessing import *
 from .utils import *
