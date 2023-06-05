@@ -41,8 +41,11 @@ def _get_label(
     label: str
         the decoded label
     """
-    lbl = "".join([chr(i) for i in struct.unpack("B" * len(obj), obj)])
-    return lbl.replace(chr(0), " ").strip()
+    out = [chr(i) for i in struct.unpack("B" * len(obj), obj)]
+    idx = np.where([i == chr(0) for i in out])[0]
+    if len(idx) > 0:
+        out = out[: idx[0]]
+    return "".join(out).strip()
 
 
 def _get_block(
@@ -84,7 +87,7 @@ def _get_block(
 def _read_frames_rts(
     fid: BufferedReader,
     nframes: int,
-    cams: list[int],
+    cams: list[int] | np.ndarray[Any, np.dtype[np.int_]],
 ):
     """
     read frames from 2D data according to the RTS (real time stream) format.
@@ -127,13 +130,13 @@ def _read_frames_rts(
         for cam, feat in enumerate(frame):
             feats[frm, cam, np.arange(feat.shape[0]), :] = feat
 
-    return feats
+    return feats.astype(np.float32)
 
 
 def _read_frames_pck(
     fid: BufferedReader,
     nframes: int,
-    cams: list[int],
+    cams: list[int] | np.ndarray[Any, np.dtype[np.int_]],
 ):
     """
     read frames from 2D data according to the PCK (packed data) format.
@@ -166,13 +169,13 @@ def _read_frames_pck(
             vals = struct.unpack(f"{num}f", fid.read(4 * num))
             vals = np.reshape(vals, (2, nfeats[cam, frm]), "F").T
             feats[frm, cam, np.arange(vals.shape[0]), :] = vals
-    return feats
+    return feats.astype(np.float32)
 
 
 def _read_frames_syn(
     fid: BufferedReader,
     nframes: int,
-    cams: list[int],
+    cams: list[int] | np.ndarray[Any, np.dtype[np.int_]],
 ):
     """
     read frames from 2D data according to the SYNC (synchronized data) format.
@@ -207,7 +210,7 @@ def _read_frames_syn(
             vals = np.reshape(vals, (2, max_feats), "F")
             vals = vals[:, : nfeats[cam, frm]].T
             feats[frm, cam, np.arange(vals.shape[0]), :] = vals
-    return feats
+    return feats.astype(np.float32)
 
 
 def _read_tracks(
@@ -242,7 +245,7 @@ def _read_tracks(
     frames: ndarray
         the features list with shape (nframes, ncams, nfeats, 2)
     """
-    obj = np.ones((ntracks, nframes, nchannels)) * np.nan
+    obj = np.ones((ntracks, nframes, nchannels), dtype=np.float32) * np.nan
     lbls = []
     for trk in np.arange(ntracks):
         # get the labels
@@ -267,7 +270,7 @@ def _read_tracks(
                     obj[trk, frm, :] = struct.unpack("f" * nchannels, vals)
 
     # split data by track
-    return dict(zip(lbls, obj))
+    return dict(zip(lbls, obj.astype(np.float32)))
 
 
 def _read_frames(
@@ -315,13 +318,14 @@ def _read_frames(
     # get the available data
     nsamp = nchannels * ntracks * nframes
     data = struct.unpack(f"{nsamp}f", fid.read(4 * nsamp))
-    data = np.reshape(data, (ntracks, nframes, nchannels))
+    data = np.reshape(data, (ntracks, nframes, nchannels), "F")
+    data = data.astype(np.float32)
 
     # return
     return dict(zip(lbls, data))
 
 
-def _read_camera_calibration(
+def _read_camera_params(
     fid: BufferedReader,
     blocks: list[dict[str, int]],
 ):
@@ -346,28 +350,23 @@ def _read_camera_calibration(
     fid, block = _get_block(fid, blocks, 2)
     if len(block) == 0:
         return None
-    cam_n = np.array(struct.unpack("1i", fid.read(4)))[0]  # number of cams
-    cam_m = np.array(struct.unpack("1I", fid.read(4)))[0]  # model
-    cam_d = np.array(struct.unpack("3f", fid.read(12)))  # dimensions
-    cam_r = np.reshape(struct.unpack("9f", fid.read(36)), (3, 3), "F")  # rot mat
-    cam_t = np.array(struct.unpack("3f", fid.read(12)))  # translation
-    if cam_m == 0:
-        cam_m = "none"
-    elif cam_m == 1:
-        cam_m = "kali"
-    elif cam_m == 2:
-        cam_m = "amass"
-    elif cam_m == 3:
-        cam_m = "thor"
+    cam_n = struct.unpack("i", fid.read(4))[0]  # number of cams
+    cam_m = struct.unpack("I", fid.read(4))[0]  # model
+    if cam_m < 4:
+        cam_m = ["none", "kali", "amass", "thor"][cam_m]
     else:
         raise ValueError("cam_m value not recognized")
+    cam_d = np.array(struct.unpack("3f", fid.read(12)), dtype=np.float32)
+    cam_r = np.reshape(struct.unpack("9f", fid.read(36)), (3, 3), "F")
+    cam_r = cam_r.astype(np.float32)
+    cam_t = np.array(struct.unpack("3f", fid.read(12))).astype(np.float32)
 
     # channels map
-    cam_map = np.array(struct.unpack(f"{cam_n}h", fid.read(2 * cam_n)))
+    cam_map = struct.unpack(f"{cam_n}h", fid.read(2 * cam_n))
 
     # parameters
-    cam_params = []
-    for _ in np.arange(cam_n):
+    cam_params = {}
+    for i in cam_map:
         if 1 == block["Format"]:  # Seelab type 1 calibration
             params = {
                 "R": np.reshape(struct.unpack("9d", fid.read(72)), (3, 3), "F"),
@@ -395,19 +394,19 @@ def _read_camera_calibration(
             msg = f"block['Format'] must be 1 or 2, but {block['Format']}"
             msg += " was found."
             raise ValueError(msg)
-        cam_params += [params]
+        params["VP"] = params["VP"].astype(np.int32)
+        cam_params[i] = params
 
     return {
+        "PARAMS": cam_params,
         "DIMENSION": cam_d,
         "ROTATION_MATRIX": cam_r,
         "TRANSLATION": cam_t,
         "MODEL": cam_m,
-        "CHANNELS": cam_map,
-        "PARAMS": cam_params,
     }
 
 
-def _read_data2d_calibration(
+def _read_camera_calibration(
     fid: BufferedReader,
     blocks: list[dict[str, int]],
 ):
@@ -435,8 +434,8 @@ def _read_data2d_calibration(
         return None
     ncams, naxesframes, nwandframes, freq = struct.unpack("iiii", fid.read(16))
     fid.seek(4, 1)
-    axespars = np.array(struct.unpack("9f", fid.read(36)))
-    wandpars = np.array(struct.unpack("2f", fid.read(8)))
+    axespars = np.array(struct.unpack("9f", fid.read(36))).astype(np.float32)
+    wandpars = np.array(struct.unpack("2f", fid.read(8))).astype(np.float32)
 
     # channels map
     cam_map = list(struct.unpack(f"{ncams}h", fid.read(2 * ncams)))
@@ -465,7 +464,7 @@ def _read_data2d_calibration(
     }
 
 
-def _read_data2d(
+def _read_camera_raw(
     fid: BufferedReader,
     blocks: list[dict[str, int]],
 ):
@@ -482,7 +481,7 @@ def _read_data2d(
 
     Returns
     -------
-    data: pd.DataFrame
+    data: dict[str, Any]
         the available data.
     """
 
@@ -513,11 +512,11 @@ def _read_data2d(
         "FEATURES": read_frames(fid, nframes, cam_map),
         "FREQUENCY": freq,
         "TIME0": time0,
-        "CAMERA_CHANNELS": cam_map,
+        "CHANNELS": cam_map,
     }
 
 
-def _read_data3d(
+def _read_camera_tracked(
     fid: BufferedReader,
     blocks: list[dict[str, int]],
 ):
@@ -581,13 +580,13 @@ def _read_data3d(
     return {
         "TRACKS": tracks,
         "LINKS": links,
-        "DIMENSIONS": dims,
-        "ROTATION_MATRIX": rmat,
-        "TRASLATION": tras,
+        "DIMENSIONS": dims.astype(np.float32),
+        "ROTATION_MATRIX": rmat.astype(np.float32),
+        "TRASLATION": tras.astype(np.float32),
     }
 
 
-def _read_optical_configuration(
+def _read_camera_configuration(
     fid: BufferedReader,
     blocks: list[dict[str, int]],
 ):
@@ -618,7 +617,7 @@ def _read_optical_configuration(
     # get the data
     cameras: dict[str, Any] = {}
     for _ in np.arange(nchns):
-        logicalindex = struct.unpack("i", fid.read(4))
+        logicalindex = struct.unpack("i", fid.read(4))[0]
         fid.seek(4, 1)
         lensname = _get_label(fid.read(32))
         camtype = _get_label(fid.read(32))
@@ -628,7 +627,7 @@ def _read_optical_configuration(
             "INDEX": logicalindex,
             "TYPE": camtype,
             "LENS": lensname,
-            "VIEWPORT": viewport,
+            "VIEWPORT": viewport.astype(np.int32),
         }
 
     return cameras
@@ -666,12 +665,19 @@ def _read_platforms_params(
     plat_map = np.array(struct.unpack(f"{nplats}h", fid.read(2 * nplats)))
 
     # read data for each platform
-    platforms: dict[str, Any] = {}
-    for i in np.arange(nplats):
+    platforms: dict[int, Any] = {}
+    cols = pd.MultiIndex.from_product([["X", "Y", "Z"], ["m"]])
+    for i, v in enumerate(plat_map):
         lbl = _get_label(fid.read(256))
-        size = list(struct.unpack("ff", fid.read(8)))
-        pos = np.reshape(struct.unpack("12f", fid.read(48)), (3, 4), "F")
-        platforms[lbl] = {"SIZE": size, "POSITION": pos, "CHANNEL": plat_map[i]}
+        size = np.array(struct.unpack("ff", fid.read(8))).astype(np.float32)
+        pos = np.reshape(struct.unpack("12f", fid.read(48)), (3, 4), "F").T
+        platforms[i] = {
+            "SIZE": size,
+            "POSITION": pd.DataFrame(pos.astype(np.float32), columns=cols),
+            "LABEL": lbl,
+            "CHANNEL": v,
+        }
+        fid.seek(256, 1)  # matlab code is missing this step
 
     return platforms
 
@@ -706,7 +712,7 @@ def _read_platforms_calibration(
     fid.seek(4, 1)
 
     # channels map
-    cam_map = list(struct.unpack(f"{ncams}h", fid.read(2 * ncams)))
+    cam_map = np.array(struct.unpack(f"{ncams}h", fid.read(2 * ncams)))
     plat_map = list(struct.unpack(f"{nplats}h", fid.read(2 * nplats)))
 
     # features extraction function
@@ -722,15 +728,16 @@ def _read_platforms_calibration(
         raise ValueError(msg)
 
     # read data for each platform
-    platforms = []
+    platforms = {}
     for plt in plat_map:
         obj = {}
-        obj["CHANNEL"] += [plt]
-        obj["LABEL"] += [_get_label(fid.read(32))]
-        frames = np.array(struct.unpack("i", fid.read(4)))[0]
-        obj["SIZE"] += [struct.unpack("ff", fid.read(8))]
-        obj["FEATURES"] += [read_frames(fid, frames, cam_map)]
-        platforms += [obj]
+        obj["CHANNEL"] = plt
+        label = _get_label(fid.read(32))
+        frames = struct.unpack("i", fid.read(4))[0]
+        obj["SIZE"] = np.array(struct.unpack("ff", fid.read(8)))
+        obj["SIZE"] = obj["SIZE"].astype(np.float32)
+        obj["FEATURES"] = read_frames(fid, frames, cam_map)
+        platforms[label] = obj
 
     return {
         "PLATFORMS": platforms,
@@ -739,7 +746,7 @@ def _read_platforms_calibration(
     }
 
 
-def _read_platforms2d(
+def _read_platforms_raw(
     fid: BufferedReader,
     blocks: list[dict[str, int]],
 ):
@@ -796,23 +803,29 @@ def _read_platforms2d(
         nsamp = nchns * ntracks * nframes
         obj = struct.unpack(f"{nsamp}f", fid.read(4 * nsamp))
         obj = np.reshape(obj, (nframes, ntracks, nchns), "F")
-        obj = np.transpose(obj, axes=[1, 0, 2])
+        obj = np.transpose(obj, axes=[1, 0, 2]).astype(np.float32)
         tracks = dict(zip(lbl, obj))
 
-    # convert the tracks in a single pandas dataframe
+    # get labels and units
     labels = ["ORIGIN.X", "ORIGIN.Y", "FORCE.X", "FORCE.Y", "FORCE.Z", "TORQUE"]
     units = ["m", "m", "N", "N", "N", "Nm"]
-    if block["Format"] in [5, 6, 7, 8]:
+    if nchns == 12:
         labels = ["R." + i for i in labels] + ["L." + i for i in labels]
         units += units
-    cols = pd.MultiIndex.from_tuples([(i, j) for i, j in zip(labels, units)])
-    for trk, obj in tracks.items():
-        idx = pd.Index(np.arange(obj.shape[0]) / freq + time0, name="TIME [s]")
-        tracks[trk] = pd.DataFrame(obj, index=idx, columns=cols)
 
+    # convert the recovered data in 3D features having shape
+    # (frames, track, nchns)
+    feats = [np.expand_dims(i, 1) for i in tracks.values()]
+    feats = np.concatenate(feats, axis=1)
+
+    # return
     return {
-        "TRACKS": tracks,
+        "FEATURES": feats,
         "CHANNELS": chn_map,
+        "LABELS": labels,
+        "UNITS": units,
+        "TIME0": time0,
+        "FREQUENCY": freq,
     }
 
 
@@ -865,11 +878,11 @@ def _read_emg(
 
     return {
         "TRACKS": tracks,
-        "EMG_CHANNELS": chn_map,
+        "EMG_CHANNELS": chn_map.astype(np.int16),
     }
 
 
-def _read_platforms3d(
+def _read_platforms_tracked(
     fid: BufferedReader,
     blocks: list[dict[str, int]],
 ):
@@ -915,9 +928,9 @@ def _read_platforms3d(
     # prepare the output data
     out = {
         "TRACKS": {},
-        "DIMENSIONS": cald,
-        "ROTATION_MATRIX": calr,
-        "TRASLATION": calt,
+        "DIMENSIONS": cald.astype(np.float32),
+        "ROTATION_MATRIX": calr.astype(np.float32),
+        "TRASLATION": calt.astype(np.float32),
     }
 
     # convert the tracks in pandas dataframes
@@ -975,14 +988,14 @@ def _read_volume(
             fid.seek(4, 1)
             nsamp = 2 * nseg
             segments = struct.unpack(f"{nsamp}i", fid.read(4 * nsamp))
-            segments = np.reshape(segments, (2, nseg), "F")
+            segments = np.reshape(segments, (2, nseg), "F").astype(np.float32)
 
             # read the data for the actual track
             arr = np.ones((nframes, 5)) * np.nan
             for sgm in np.arange(nseg):
                 for frm in np.arange(segments[0, sgm], segments[1, sgm] + 1):
                     arr[frm] = np.array(struct.unpack("ffffi", fid.read(20)))
-            tracks[label] = arr
+            tracks[label] = arr.astype(np.float32)
 
     elif block["Format"] in [2]:  # by frame
         # get the labels
@@ -991,11 +1004,12 @@ def _read_volume(
             labels += [_get_label(fid.read(256))]
 
         # get the available data
-        tracks = {i: np.ones((nframes, 5)) * np.nan for i in labels}
+        tracks = (np.ones((nframes, 5)) * np.nan).astype(np.float32)
+        tracks = {i: tracks.copy() for i in labels}
         for frm in np.arange(nframes):
             for trk in labels:
                 vals = np.array(struct.unpack("ffffi", fid.read(20)))
-                tracks[trk][frm, :] = vals
+                tracks[trk][frm, :] = vals.astype(np.float32)
 
     else:  # errors
         msg = f"block['Format'] must be 1, 2, but {block['Format']}"
@@ -1059,7 +1073,7 @@ def _read_data_generic(
     tracks.columns = col
     return {
         "TRACKS": tracks,
-        "CHANNELS": chn_map,
+        "CHANNELS": chn_map.astype(np.int16),
     }
 
 
@@ -1101,10 +1115,10 @@ def _read_calibration_generic(
         sig_cal[i, 1:] = struct.unpack("ff", fid.read(8))
 
     return {
-        "CHANNELS": sig_map,
-        "DEVICE_TYPE": sig_cal[:, 0],
-        "M": sig_cal[:, 1],
-        "Q": sig_cal[:, 2],
+        "CHANNELS": sig_map.astype(np.int16),
+        "DEVICE_TYPE": sig_cal[:, 0].astype(np.int32),
+        "M": sig_cal[:, 1].astype(np.float32),
+        "Q": sig_cal[:, 2].astype(np.float32),
     }
 
 
@@ -1167,7 +1181,7 @@ def read_tdf(
     """
 
     tdf_signature = "41604B82CA8411D3ACB60060080C6816"
-    tdf: dict[str, dict[str, Any] | None] = {}
+    tdf: dict[str, dict[Any, Any] | None] = {}
     version = float("nan")
 
     # check the validity of the entered path
@@ -1205,17 +1219,17 @@ def read_tdf(
         # read all entries
         tdf["VOLUME"] = _read_volume(fid, blocks)
         tdf["DATA_CALIBRATION_GENERIC"] = _read_calibration_generic(fid, blocks)
+        tdf["CAMERA_PARAMS"] = _read_camera_params(fid, blocks)
         tdf["CAMERA_CALIBRATION"] = _read_camera_calibration(fid, blocks)
-        tdf["DATA2D_CALIBRATION"] = _read_data2d_calibration(fid, blocks)
-        tdf["OPTICAL_CONFIGURATION"] = _read_optical_configuration(fid, blocks)
+        tdf["CAMERA_CONFIGURATION"] = _read_camera_configuration(fid, blocks)
         tdf["PLATFORMS_PARAMETERS"] = _read_platforms_params(fid, blocks)
         tdf["PLATFORMS_CALIBRATION"] = _read_platforms_calibration(fid, blocks)
-        tdf["PLATFORMS2D"] = _read_platforms2d(fid, blocks)
-        tdf["DATA2D"] = _read_data2d(fid, blocks)
-        tdf["DATA3D"] = _read_data3d(fid, blocks)
+        tdf["PLATFORMS_RAW"] = _read_platforms_raw(fid, blocks)
+        tdf["CAMERA_RAW"] = _read_camera_raw(fid, blocks)
+        tdf["CAMERA_TRACKED"] = _read_camera_tracked(fid, blocks)
         tdf["DATA_GENERIC"] = _read_data_generic(fid, blocks)
         tdf["EMG"] = _read_emg(fid, blocks)
-        tdf["PLATFORMS3D"] = _read_platforms3d(fid, blocks)
+        tdf["PLATFORMS_TRACKED"] = _read_platforms_tracked(fid, blocks)
         tdf["EVENTS"] = _read_events(fid, blocks)
 
     except Exception as exc:
