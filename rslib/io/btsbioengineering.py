@@ -801,17 +801,14 @@ def _read_platforms2d(
 
     # convert the tracks in a single pandas dataframe
     labels = ["ORIGIN.X", "ORIGIN.Y", "FORCE.X", "FORCE.Y", "FORCE.Z", "TORQUE"]
-    units = ["m", "m", "m", "N", "N", "N", "Nm"]
-    columns = [[i, j] for i, j in zip(labels, units)]
+    units = ["m", "m", "N", "N", "N", "Nm"]
+    if block["Format"] in [5, 6, 7, 8]:
+        labels = ["R." + i for i in labels] + ["L." + i for i in labels]
+        units += units
+    cols = pd.MultiIndex.from_tuples([(i, j) for i, j in zip(labels, units)])
     for trk, obj in tracks.items():
         idx = pd.Index(np.arange(obj.shape[0]) / freq + time0, name="TIME [s]")
-        if block["Format"] in [1, 3, 5, 7]:
-            col = [["R." + i[0], i[1]] for i in columns]
-            col += [["L." + i[0], i[1]] for i in columns]
-        else:
-            col = columns
-        col = pd.MultiIndex.from_arrays(np.array(col))
-        tracks[trk] = pd.DataFrame(obj, index=idx, columns=col)
+        tracks[trk] = pd.DataFrame(obj, index=idx, columns=cols)
 
     return {
         "TRACKS": tracks,

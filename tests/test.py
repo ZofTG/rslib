@@ -4,6 +4,9 @@
 
 
 import os
+import sys
+
+sys.path += [os.getcwd()]
 import rslib
 
 
