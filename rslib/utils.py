@@ -56,6 +56,18 @@ class Participant:
     _weight = None
     _birth_date = None
     _recording_date = date  # type:ignore
+    _units = {
+        "fullname": "",
+        "surname": "",
+        "name": "",
+        "gender": "",
+        "height": "m",
+        "weight": "kg",
+        "bmi": "kg/m^2",
+        "birthdate": "",
+        "age": "years",
+        "hrmax": "bpm",
+    }
 
     def __init__(
         self,
@@ -248,12 +260,10 @@ class Participant:
         """
         get the age of the participant in years
         """
-        if self.age is not None:
+        if self._age is not None:
             return self._age
         if self._birth_date is not None:
-            recy = self._recording_date.year
-            daty = self._birth_date.year
-            return int(recy - daty)  # type: ignore
+            return int((self._recording_date - self._birth_date).days // 365)  # type: ignore
         return None
 
     @property
@@ -273,40 +283,10 @@ class Participant:
             return None
         return 207 - 0.7 * self.age
 
-    @classmethod
-    def from_cosmed_xlsx(
-        cls,
-        file: str,
-    ):
-        """
-        return the Participant object read by a Cosmed Omnia excel export.
-
-        Parameters
-        ----------
-        file: str
-            the path to the xlsx file containing the data.
-
-        Returns
-        -------
-        prt: Participant
-            a Participant instance.
-        """
-        dfr = pd.read_excel(file, 0)
-        surname, name, gender, _, height, weight, birth_date = dfr.iloc[:7, 1]
-        birth_date = birth_date + "-00:00:00"
-        datetime_format = "%d/%m/%Y-%H:%M:%S"
-        birth_date = datetime.strptime(birth_date, datetime_format).date()
-        test_date = str(dfr.iloc[7, 1]) + "-00:00:00"
-        test_date = datetime.strptime(test_date, datetime_format).date()
-        return cls(
-            surname=surname,
-            name=name,
-            gender=gender,
-            height=height,
-            weight=weight,
-            birth_date=birth_date,
-            recording_date=test_date,
-        )
+    @property
+    def units(self):
+        """return the unit of measurement of the stored data."""
+        return self._units
 
     def copy(self):
         """return a copy of the object."""
@@ -325,22 +305,35 @@ class Participant:
     def dict(self):
         """return a dict representation of self"""
         return {
-            "fullname": self.fullname,
             "surname": self.surname,
             "name": self.name,
             "gender": self.gender,
-            "height": self.height,
-            "weight": self.weight,
-            "bmi": self.bmi,
             "birthdate": self.birthdate,
-            "age": self.age,
-            "hrmax": self.hrmax,
+            "age [" + self.units["age"] + "]": self.age,
+            "height [" + self.units["height"] + "]": self.height,
+            "weight [" + self.units["weight"] + "]": self.weight,
+            "bmi [" + self.units["bmi"] + "]": self.bmi,
+            "hrmax [" + self.units["hrmax"] + "]": self.hrmax,
         }
+
+    @property
+    def series(self):
+        """return a pandas.Series representation of self"""
+        vals = ["surname", "name", "gender", "birthdate", "age"]
+        vals += ["height", "weight", "bmi", "hrmax"]
+        vals = pd.MultiIndex.from_tuples([(i, self.units[i]) for i in vals])
+        return pd.Series(list(self.dict.values()), index=vals)
 
     @property
     def dataframe(self):
         """return a pandas.DataFrame representation of self"""
-        return pd.DataFrame({i: [v] for i, v in self.dict.items()})
+        return pd.DataFrame(self.series).T
+
+    def __repr__(self):
+        return self.__str__()
+
+    def __str__(self):
+        return self.dataframe.__str__()
 
 
 #! FUNCTIONS

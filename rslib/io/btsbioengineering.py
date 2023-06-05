@@ -667,15 +667,15 @@ def _read_platforms_params(
     # read data for each platform
     platforms: dict[int, Any] = {}
     cols = pd.MultiIndex.from_product([["X", "Y", "Z"], ["m"]])
-    for i, v in enumerate(plat_map):
+    for idx, plat in enumerate(plat_map):
         lbl = _get_label(fid.read(256))
         size = np.array(struct.unpack("ff", fid.read(8))).astype(np.float32)
         pos = np.reshape(struct.unpack("12f", fid.read(48)), (3, 4), "F").T
-        platforms[i] = {
+        platforms[idx] = {
             "SIZE": size,
             "POSITION": pd.DataFrame(pos.astype(np.float32), columns=cols),
             "LABEL": lbl,
-            "CHANNEL": v,
+            "CHANNEL": plat,
         }
         fid.seek(256, 1)  # matlab code is missing this step
 
