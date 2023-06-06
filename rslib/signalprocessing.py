@@ -1,5 +1,7 @@
 """
-signalprocessing module
+signalprocessing
+
+a set of functions dedicated to the processing and analysis of 1D signals
 
 Functions
 ---------
@@ -40,7 +42,10 @@ psd
     periodogram method.
 
 crossings
+    obtain the location of the samples being across a target value.
 
+xcorr
+    get the cross/auto-correlation and lag of of multiple/one 1D signal.
 """
 
 

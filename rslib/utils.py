@@ -1,5 +1,5 @@
 """
-UTILS
+utils
 
 module containing several utilities that can be used for multiple purposes.
 
