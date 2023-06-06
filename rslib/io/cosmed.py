@@ -1,4 +1,18 @@
-"""cosmed files reading module"""
+"""
+cosmed
+
+module containing functions for reading Cosmed Omnia export files.
+
+Constants
+---------
+COSMED_DATETIME_FORMAT
+    the datetime format used within the Cosmed Omnia file export.
+
+Functions
+---------
+read_cosmed_xlsx
+    read .xlsx files generated trough the Cosmed Omnia software.
+"""
 
 
 __all__ = ["COSMED_DATETIME_FORMAT", "read_cosmed_xlsx"]

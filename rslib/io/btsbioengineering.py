@@ -1,7 +1,20 @@
-"""btsbioengineering files reading module"""
+"""
+btsbioengineering
+
+read specific BtsBioengineering file formats such as .tdf and .emt
+extensions.
+
+Functions
+---------
+read_tdf
+    read the data contained in a tdf file.
+
+read_emt
+    read the data contained in a emt file.
+"""
 
 
-__all__ = ["read_tdf"]
+__all__ = ["read_tdf", "read_emt"]
 
 
 #! IMPORTS
@@ -14,6 +27,8 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+
+from ..utils import assert_file_extension
 
 
 #! CONSTANTS
@@ -1168,7 +1183,7 @@ def read_tdf(
     path: str,
 ):
     """
-    Return the readings from a .tdf file as dicts of 3D objects.
+    Return the readings from a .tdf file.
 
     Parameters
     ----------
@@ -1177,7 +1192,8 @@ def read_tdf(
 
     Returns
     -------
-    a dict containing the distinct data properly arranged by type.
+    tdf: dict[str, Any]
+        a dict containing the distinct data properly arranged by type.
     """
 
     tdf_signature = "41604B82CA8411D3ACB60060080C6816"
@@ -1185,8 +1201,7 @@ def read_tdf(
     version = float("nan")
 
     # check the validity of the entered path
-    assert os.path.exists(path), path + " does not exist."
-    assert path[-4:] == ".tdf", path + ' must be an ".tdf" path.'
+    assert_file_extension(path, "tdf")
 
     # try opening the file
     fid = open(path, "rb")
@@ -1239,3 +1254,49 @@ def read_tdf(
         fid.close()
 
     return tdf  # , version
+
+
+def read_emt(
+    path: str,
+):
+    """
+    Return the readings from a .emt file as dicts of 3D objects.
+
+    Parameters
+    ----------
+    path: str
+        an existing tdf path.
+
+    Returns
+    -------
+    emt: dict[str, pandas.DataFrame]
+        a dict where each key is a specific 3D object contained in the emt file.
+
+    object_type: str
+        the type of data contained within the emt file.
+    """
+
+    # check the validity of the entered path
+    assert_file_extension(path, "emt")
+
+    # read the path
+    with open(path, "r") as buf:
+        lines = [i.replace("\n", "").split("\t") for i in buf.readlines()]
+
+    # get type and unit
+    obj_type = lines[2][1]
+    obj_unit = lines[3][1]
+
+    # get headers, raw data and index
+    headers = [tuple(i.rsplit(".", 1) + [obj_unit]) for i in lines[10][2:]]
+    raw = np.array(lines[11:]).astype(float)
+    index = pd.Index(raw[:, 1], name="Time [s]")
+    names = ["Label", "Dimension", "Unit"]
+    cols = pd.MultiIndex.from_tuples(headers, names=names)
+    data = pd.DataFrame(raw[:, 2:], index, cols)
+
+    # split data by label
+    labels = np.unique(data.columns.get_level_values("Label").to_numpy())
+    out = {i: data.loc[:, i] for i in labels}
+
+    return out, obj_type
