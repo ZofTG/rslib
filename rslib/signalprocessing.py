@@ -1,4 +1,47 @@
-"""signalprocessing module"""
+"""
+signalprocessing module
+
+Functions
+---------
+winter_derivative1
+    obtain the first derivative of a 1D signal according to Winter 2009 method.
+
+winter_derivative2
+    obtain the second derivative of a 1D signal according to Winter 2009 method.
+
+feedman_diaconis_bins
+    digitize a 1D signal in bins defined according to the freedman-diaconis rule
+
+fir_filt
+    apply a FIR (Finite Impulse Response) filter to a 1D signal
+
+mean_filt
+    apply a moving average filter to a 1D signal
+
+median_filt
+    apply a median filter to a 1D signal
+
+butterworth_filt
+    apply a butterworth filter to a 1D signal
+
+cubicspline_interp
+    apply cubic spline interpolation to a 1D signal
+
+residual_analysis
+    get the optimal cut-off frequency for a filter on 1D signals according
+    to Winter 2009 'residual analysis' method
+
+crossovers
+    get the x-axis coordinates of the junction between the lines best fitting
+    a 1D signal in a least-squares sense.
+
+psd
+    obtain the power spectral density estimate of a 1D signal using the
+    periodogram method.
+
+crossings
+
+"""
 
 
 #! IMPORTS

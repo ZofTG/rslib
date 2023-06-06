@@ -1,4 +1,23 @@
-"""utilities module"""
+"""
+UTILS
+
+module containing several utilities that can be used for multiple purposes.
+
+Classes
+-------
+Participant
+    an instance defining the general parameters of one subject during a test.
+
+Functions
+---------
+magnitude
+    get the order of magnitude of a numeric scalar value according to the
+    specified base.
+
+get_files
+    get the full path of the files contained within the provided folder
+    (and optionally subfolders) having the provided extension.
+"""
 
 
 #! IMPORTS
