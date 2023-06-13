@@ -23,3 +23,4 @@ utils
 from .io import *
 from .signalprocessing import *
 from .utils import *
+from .lsreg import *
