@@ -310,36 +310,21 @@ class Participant:
 
     def copy(self):
         """return a copy of the object."""
-        return Participant(
-            name=self.name,
-            surname=self.surname,
-            birth_date=self.birthdate,
-            height=self.height,
-            weight=self.weight,
-            age=self.age,
-            gender=self.gender,
-            recording_date=self._recording_date,  # type: ignore
-        )
+        return Participant(**{i: getattr(self, i) for i in self.units.keys()})
 
     @property
     def dict(self):
         """return a dict representation of self"""
-        return {
-            "surname": self.surname,
-            "name": self.name,
-            "gender": self.gender,
-            "birthdate": self.birthdate,
-            "age [" + self.units["age"] + "]": self.age,
-            "height [" + self.units["height"] + "]": self.height,
-            "weight [" + self.units["weight"] + "]": self.weight,
-            "bmi [" + self.units["bmi"] + "]": self.bmi,
-            "hrmax [" + self.units["hrmax"] + "]": self.hrmax,
-        }
+        out = {}
+        for i, v in self.units.items():
+            out[i + ((" [" + v + "]") if v != "" else "")] = getattr(self, i)
+        return out
 
     @property
     def series(self):
         """return a pandas.Series representation of self"""
-        vals = pd.MultiIndex.from_tuples([(i, v) for i, v in self.units.items()])
+        vals = [(i, v) for i, v in self.units.items()]
+        vals = pd.MultiIndex.from_tuples(vals)
         return pd.Series(list(self.dict.values()), index=vals)
 
     @property
