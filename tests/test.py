@@ -1,13 +1,15 @@
-"""pylab testing module"""
+"""rslib testing module"""
 
 #! IMPORTS
 
 
-import os
+from os.path import dirname, join
 import sys
 
-sys.path += [os.getcwd()]
-import rslib
+sys.path += [dirname(__file__)]
+sys.path += [join(dirname(dirname(__file__)), "src")]
+
+from rslib import *
 
 
 #! MAIN
@@ -16,19 +18,16 @@ import rslib
 if __name__ == "__main__":
     # io
     print("TESTING TDF DATA READING")
-    TDF_FILE = os.path.join(os.getcwd(), "tests", "tdf_sample.tdf")
-    tdf_data = rslib.read_tdf(TDF_FILE)
+    tdf_data = read_tdf("tdf_sample.tdf")
     print(tdf_data)
     print("")
 
     print("TESTING EMT DATA READING")
-    EMT_FILE = os.path.join(os.getcwd(), "tests", "emt_sample.emt")
-    emt_data = rslib.read_emt(EMT_FILE)
+    emt_data = read_emt("emt_sample.emt")
     print(emt_data)
     print("")
 
     print("TESTING COSMED XLSX DATA READING")
-    COSMED_FILE = os.path.join(os.getcwd(), "tests", "cosmed_sample.xlsx")
-    cosmed_data, participant = rslib.read_cosmed_xlsx(COSMED_FILE)
+    cosmed_data, participant = read_cosmed_xlsx("cosmed_sample.xlsx")
     print(cosmed_data)
     print(participant)

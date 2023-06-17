@@ -5,6 +5,15 @@ a set of functions dedicated to the processing and analysis of 1D signals
 
 Functions
 ---------
+find_peaks
+    find peaks in the signal
+
+contiguous_batches
+    get the indices defining contiguous samples in the signal.
+
+nextpow
+    the next power of the selected base.
+
 winter_derivative1
     obtain the first derivative of a 1D signal according to Winter 2009 method.
 
@@ -53,13 +62,16 @@ xcorr
 
 from types import FunctionType, MethodType
 from typing import Any, Literal
-import itertools as it
+from itertools import product
+from scipy import signal  # type: ignore
+from scipy.interpolate import CubicSpline  # type: ignore
 import numpy as np
-import scipy.interpolate as si
-import scipy.signal as ss
 
 
 __all__ = [
+    "find_peaks",
+    "continuous_batches",
+    "nextpow",
     "winter_derivative1",
     "winter_derivative2",
     "freedman_diaconis_bins",
@@ -75,7 +87,107 @@ __all__ = [
     "xcorr",
 ]
 
+
 #! FUNCTIONS
+
+
+def find_peaks(
+    arr: np.ndarray[Any, np.dtype[np.float_]],
+    height: int | float | None = None,
+    distance: int | None = None,
+):
+    """
+    find peaks in the signal
+
+    Parameters
+    ----------
+    arr : np.ndarray[Any, np.dtype[np.float_]]
+        the input signal
+
+    height : Union[int, float, None]
+        the minimum height of the peaks
+
+    distance : Union[int, None]
+        the minimum distance between the peaks
+
+    Returns
+    -------
+    p: np.ndarray[Any, np.dtype[np.int_]]
+        the array containing the samples corresponding to the detected peaks
+    """
+    # get all peaks
+    d1y = arr[1:] - arr[:-1]
+    all_peaks = np.where((d1y[1:] < 0) & (d1y[:-1] >= 0))[0] + 1
+
+    # select those peaks at minimum height
+    if len(all_peaks) > 0 and height is not None:
+        all_peaks = all_peaks[arr[all_peaks] >= height]
+
+    # select those peaks separated at minimum by the given distance
+    if len(all_peaks) > 1 and distance is not None:
+        i = 1
+        while i < len(all_peaks):
+            if all_peaks[i] - all_peaks[i - 1] < distance:
+                if arr[all_peaks[i]] > arr[all_peaks[i - 1]]:
+                    all_peaks = np.append(all_peaks[: i - 1], all_peaks[i:])
+                else:
+                    all_peaks = np.append(all_peaks[:i], all_peaks[i + 1 :])
+            else:
+                i += 1
+
+    return all_peaks.astype(int)
+
+
+def continuous_batches(
+    arr: np.ndarray[Any, np.dtype[np.bool_]],
+):
+    """
+    return the list of indices defining batches where consecutive arr
+    values are True.
+
+    Parameters
+    ----------
+    arr : np.ndarray[Any, np.dtype[np.bool_]]
+        a 1D boolean array
+
+    Returns
+    -------
+    samples: list[list[bool]]
+        a list of lists containing the samples defining a batch of consecutive
+        True values.
+    """
+    locs = arr.astype(int)
+    idxs = np.diff(locs)
+    idxs = np.concatenate([[locs[0]], idxs])
+    crs = locs + idxs
+    if locs[-1] == 1:
+        crs = np.concatenate([crs, [-1]])
+    starts = np.where(crs == 2)[0]
+    stops = np.where(crs == -1)[0]
+    return [np.arange(i, v).tolist() for i, v in zip(starts, stops)]
+
+
+def nextpow(
+    val: int | float,
+    base: int = 2,
+):
+    """
+    get the next power of the provided value according to the given base.
+
+    Parameters
+    ----------
+    val : Union[int, float]
+        the target value
+
+    base : int, optional
+        the base to be elevated
+
+    Returns
+    -------
+    out: int
+        the next power of the provided value according to the given base.
+    """
+    return int(round(base ** np.ceil(np.log(val) / np.log(base))))
 
 
 def winter_derivative1(
@@ -221,7 +333,7 @@ def freedman_diaconis_bins(
 
 
 def mean_filt(
-    signal: np.ndarray[Any, np.dtype[np.float_]],
+    arr: np.ndarray[Any, np.dtype[np.float_]],
     order: int = 1,
     pad_style: str = "edge",
     offset: float = 0.5,
@@ -231,8 +343,7 @@ def mean_filt(
 
     Parameters
     ----------
-
-    signal: np.ndarray[Any, np.dtype[np.float_]],
+    arr: np.ndarray[Any, np.dtype[np.float_]],
         the signal to be filtered.
 
     order: int = 1,
@@ -304,17 +415,17 @@ def mean_filt(
     win = np.unique((np.arange(order) - offset * (order - 1)).astype(int))
 
     # get the indices of the samples
-    idx = [win + order - 1 + j for j in np.arange(len(signal))]
+    idx = [win + order - 1 + j for j in np.arange(len(arr))]
 
     # padding
-    filtered = np.pad(signal, order - 1, mode=pad_style)  # type: ignore
+    filtered = np.pad(arr, order - 1, mode=pad_style)  # type: ignore
 
     # get the mean of each window
     return np.array([np.mean(filtered[j]) for j in idx]).flatten().astype(float)
 
 
 def median_filt(
-    signal: np.ndarray[Any, np.dtype[np.float_]],
+    arr: np.ndarray[Any, np.dtype[np.float_]],
     order: int = 1,
     pad_style: str = "edge",
     offset: float = 0.5,
@@ -325,7 +436,7 @@ def median_filt(
     Parameters
     ----------
 
-    signal: np.ndarray[Any, np.dtype[np.float_]],
+    arr: np.ndarray[Any, np.dtype[np.float_]],
         the signal to be filtered.
 
     order: int = 1,
@@ -397,10 +508,10 @@ def median_filt(
     win = np.unique((np.arange(order) - offset * (order - 1)).astype(int))
 
     # get the indices of the samples
-    idx = [win + order - 1 + j for j in np.arange(len(signal))]
+    idx = [win + order - 1 + j for j in np.arange(len(arr))]
 
     # padding
-    filtered = np.pad(signal, order - 1, mode=pad_style)  # type: ignore
+    filtered = np.pad(arr, order - 1, mode=pad_style)  # type: ignore
 
     # get the mean of each window
     out = [np.median(filtered[j]) for j in idx]
@@ -408,7 +519,7 @@ def median_filt(
 
 
 def fir_filt(
-    signal: np.ndarray[Any, np.dtype[np.float_]],
+    arr: np.ndarray[Any, np.dtype[np.float_]],
     fcut: float | int | list[float | int] | tuple[float | int] = 1,
     fsamp: float | int = 2,
     order: int = 5,
@@ -450,7 +561,7 @@ def fir_filt(
     Parameters
     ----------
 
-    signal: np.ndarray[Any, np.dtype[np.float_]],
+    arr: np.ndarray[Any, np.dtype[np.float_]],
         the signal to be filtered.
 
     fcut: float | int | list[float | int], tuple[float | int] = 1,
@@ -534,27 +645,27 @@ def fir_filt(
     filtered: 1D array
         the filtered signal.
     """
-    coefs = ss.firwin(
+    coefs = signal.firwin(
         order,
         fcut,
         window=wtype,
         pass_zero=ftype,  # type: ignore
         fs=fsamp,
     )
-    val = signal[0] if pstyle == "constant" else 0
+    val = arr[0] if pstyle == "constant" else 0
     padded = np.pad(
-        signal,
+        arr,
         pad_width=(2 * order - 1, 0),
         mode=pstyle,
         constant_values=val,
     )
     avg = np.mean(padded)
-    out = ss.lfilter(coefs, 1.0, padded - avg)[(2 * order - 1) :]
+    out = signal.lfilter(coefs, 1.0, padded - avg)[(2 * order - 1) :]
     return np.array(out).flatten().astype(float) + avg
 
 
 def butterworth_filt(
-    signal: np.ndarray[Any, np.dtype[np.float_]],
+    arr: np.ndarray[Any, np.dtype[np.float_]],
     fcut: float | int | list[float | int] | tuple[float | int] = 1,
     fsamp: float | int = 2,
     order: int = 5,
@@ -568,7 +679,7 @@ def butterworth_filt(
     Parameters
     ----------
 
-    signal: np.ndarray[Any, np.dtype[np.float_]],
+    arr: np.ndarray[Any, np.dtype[np.float_]],
         the signal to be filtered.
 
     fcut: float | int | list[float | int], tuple[float | int] = 1,
@@ -596,7 +707,7 @@ def butterworth_filt(
     """
 
     # get the filter coefficients
-    sos = ss.butter(
+    sos = signal.butter(
         order,
         (np.array([fcut]).flatten() / (0.5 * fsamp)),
         ftype,
@@ -606,9 +717,9 @@ def butterworth_filt(
 
     # get the filtered data
     if phase_corrected:
-        return ss.sosfiltfilt(sos, signal)
+        return signal.sosfiltfilt(sos, arr)
     else:
-        return ss.sosfilt(sos, signal)
+        return signal.sosfilt(sos, arr)
 
 
 def cubicspline_interp(
@@ -650,12 +761,12 @@ def cubicspline_interp(
         x_new = np.linspace(np.min(x_old), np.max(x_old), nsamp)  # type: ignore
 
     # get the cubic-spline interpolated y
-    cspline = si.CubicSpline(x_old, y_old)
+    cspline = CubicSpline(x_old, y_old)
     return cspline(x_new).flatten().astype(float)
 
 
 def residual_analysis(
-    signal: np.ndarray[Any, np.dtype[np.float_]],
+    arr: np.ndarray[Any, np.dtype[np.float_]],
     ffun: FunctionType | MethodType,
     fnum: int = 1000,
     fmax: float | int | None = None,
@@ -667,8 +778,7 @@ def residual_analysis(
 
     Parameters
     ----------
-
-    signal: np.ndarray[Any, np.dtype[np.float_]],
+    arr: np.ndarray[Any, np.dtype[np.float_]],
         the signal to be investigated
 
     ffun: FunctionType | MethodType,
@@ -727,7 +837,7 @@ def residual_analysis(
 
     # data check
     if fmax is None:
-        pwr, frq = psd(signal, 1)
+        pwr, frq = psd(arr, 1)
         idx = int(np.where(np.cumsum(pwr) / np.sum(pwr) >= 0.99)[0][0])  # type: ignore
         fmax = float(frq[idx])
     assert 0 < fmax < 0.5, "fmax must lie in the (0, 0.5) range."
@@ -735,7 +845,7 @@ def residual_analysis(
 
     # get the optimal crossing over point
     frq = np.linspace(0, fmax, fnum + 1)[1:].astype(float)
-    res = np.array([np.sum((signal - ffun(signal, i)) ** 2) for i in frq])
+    res = np.array([np.sum((arr - ffun(arr, i)) ** 2) for i in frq])
     iopt = crossovers(res, nseg, minsamp)[0][-1]
     fopt = float(frq[iopt])
 
@@ -781,7 +891,7 @@ def _sse(
 
 
 def crossovers(
-    signal: np.ndarray[Any, np.dtype[np.float_]],
+    arr: np.ndarray[Any, np.dtype[np.float_]],
     segments: int = 2,
     min_samples: int = 5,
 ):
@@ -791,8 +901,7 @@ def crossovers(
 
     Parameters
     ----------
-
-    signal:np.ndarray[Any, np.dtype[np.float_]],
+    arr:np.ndarray[Any, np.dtype[np.float_]],
         the signal to be fitted.
 
     segments:int=2,
@@ -840,15 +949,15 @@ def crossovers(
     assert min_samples >= 2, "'min_samples' must be >= 2."
 
     # get the X axis
-    xaxis = np.arange(len(signal)).astype(float)
+    xaxis = np.arange(len(arr)).astype(float)
 
     # get all the possible combinations of segments
     combs = []
     for i in np.arange(1, segments):
         start = min_samples * i
-        stop = len(signal) - min_samples * (segments - i)
+        stop = len(arr) - min_samples * (segments - i)
         combs += [np.arange(start, stop)]
-    combs = list(it.product(*combs))
+    combs = list(product(*combs))
 
     # remove those combinations having segments shorter than "samples"
     combs = [i for i in combs if np.all(np.diff(i) >= min_samples)]
@@ -857,12 +966,12 @@ def crossovers(
     combs = (
         np.zeros((len(combs), 1)),
         np.atleast_2d(combs),
-        np.ones((len(combs), 1)) * len(signal) - 1,
+        np.ones((len(combs), 1)) * len(arr) - 1,
     )
     combs = np.hstack(combs).astype(int)
 
     # calculate the residuals for each combination
-    sse = np.array([_sse(xaxis, signal, i) for i in combs])
+    sse = np.array([_sse(xaxis, arr, i) for i in combs])
 
     # sort the residuals
     sortedsse = np.argsort(sse)
@@ -872,14 +981,14 @@ def crossovers(
 
     # get the fitting slopes
     slopes = [np.arange(i0, i1) for i0, i1 in zip(crs[:-1], crs[1:])]
-    slopes = [np.polyfit(i, signal[i], 1).astype(float) for i in slopes]
+    slopes = [np.polyfit(i, arr[i], 1).astype(float) for i in slopes]
 
     # return the crossovers
     return crs[1:-1].astype(int).tolist(), slopes
 
 
 def psd(
-    signal: np.ndarray[Any, np.dtype[np.float_]],
+    arr: np.ndarray[Any, np.dtype[np.float_]],
     fsamp: float | int = 1.0,
 ):
     """
@@ -887,8 +996,7 @@ def psd(
 
     Parameters
     ----------
-
-    signal: np.ndarray[Any, np.dtype[np.float_]],
+    arr: np.ndarray[Any, np.dtype[np.float_]],
         A 1D numpy array
 
     fssamp: float | int = 1.0,
@@ -906,7 +1014,7 @@ def psd(
     """
 
     # get the psd
-    fft = np.fft.rfft(signal - np.mean(signal)) / len(signal)
+    fft = np.fft.rfft(arr - np.mean(arr)) / len(arr)
     amp = abs(fft)
     pwr = np.concatenate([[amp[0]], 2 * amp[1:-1], [amp[-1]]]).flatten() ** 2
     frq = np.linspace(0, fsamp / 2, len(pwr))
@@ -916,7 +1024,7 @@ def psd(
 
 
 def crossings(
-    signal: np.ndarray[Any, np.dtype[np.float_]],
+    arr: np.ndarray[Any, np.dtype[np.float_]],
     value: int | float = 0.0,
 ):
     """
@@ -924,27 +1032,26 @@ def crossings(
 
     Parameters
     ----------
+    arr: np.ndarray[Any, np.dtype[np.float_]],
+        the 1D signal from which the crossings have to be found.
 
-        signal: np.ndarray[Any, np.dtype[np.float_]],
-            the 1D signal from which the crossings have to be found.
-
-        value: int | float = 0.0,
+    value: int | float = 0.0,
+        the crossing value.
 
     Returns
     -------
+    crs: 1D array
+        the samples corresponding to the crossings.
 
-        crs: 1D array
-            the samples corresponding to the crossings.
-
-        sgn: 1D array
-            the sign of the crossings. Positive sign means crossings
-            where the signal moves from values lower than "value" to
-            values higher than "value". Negative sign indicate the
-            opposite trend.
+    sgn: 1D array
+        the sign of the crossings. Positive sign means crossings
+        where the signal moves from values lower than "value" to
+        values higher than "value". Negative sign indicate the
+        opposite trend.
     """
 
     # get the sign of the signal without the offset
-    sgn = np.sign(signal - value)
+    sgn = np.sign(arr - value)
 
     # get the location of the crossings
     crs = np.where(abs(sgn[1:] - sgn[:-1]) == 2)[0].astype(int)
@@ -1011,8 +1118,8 @@ def xcorr(
     xcr = []
     for i in np.arange(rows - 1):
         for j in np.arange(i + 1, rows):
-            res = np.atleast_2d(ss.fftconvolve(sigv[i], sigv[j][::-1], "full"))
-            xcr += [res]
+            res = signal.fftconvolve(sigv[i], sigv[j][::-1], "full")
+            xcr += [np.atleast_2d(res)]
 
     # average over all the multiples
     xcr = np.mean(np.concatenate(xcr, axis=0), axis=0)
