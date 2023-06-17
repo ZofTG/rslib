@@ -339,9 +339,7 @@ class Participant:
     @property
     def series(self):
         """return a pandas.Series representation of self"""
-        vals = ["surname", "name", "gender", "birthdate", "age"]
-        vals += ["height", "weight", "bmi", "hrmax"]
-        vals = pd.MultiIndex.from_tuples([(i, self.units[i]) for i in vals])
+        vals = pd.MultiIndex.from_tuples([(i, v) for i, v in self.units.items()])
         return pd.Series(list(self.dict.values()), index=vals)
 
     @property
