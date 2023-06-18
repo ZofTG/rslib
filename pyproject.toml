@@ -18,11 +18,11 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
-dynamic = ["version", "readme", "dependencies"]
+version = "0.5"
+dynamic = ["readme", "dependencies"]
 
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt"]}
-version = {attr = "rslib.VERSION"}
 readme = {file = "README.md"}
 
 [project.urls]
