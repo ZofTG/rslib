@@ -1,21 +1,29 @@
 [build-system]
-requires = ["setuptools>=67.7", "pandas>=2.0", "scipy>=1.10", "wheel", "openpyxl"]
+requires = [
+    "setuptools",
+    "wheel",
+    "pandas==2.0.2",
+    "scipy==1.10.1",
+    "openpyxl==3.1.2",
+]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "rslib"
-version = "0.3"
-authors = [
-  { name="Luca Zoffoli", email="lzoffoli@technogym.com" },
-]
+authors = [{ name="Luca Zoffoli", email="lzoffoli@technogym.com" }]
 description = "A small package to simplify data processing in python."
-readme = "README.md"
 requires-python = ">=3.11"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
+dynamic = ["version", "readme", "dependencies"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+version = {attr = "rslib.VERSION"}
+readme = {file = "README.md"}
 
 [project.urls]
 "Homepage" = "https://github.com/ZofTG/rslib"
