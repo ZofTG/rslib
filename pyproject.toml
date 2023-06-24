@@ -2,9 +2,9 @@
 requires = [
     "setuptools",
     "wheel",
-    "pandas==2.0.2",
-    "scipy==1.10.1",
-    "openpyxl==3.1.2",
+    "pandas",
+    "scipy",
+    "openpyxl",
 ]
 build-backend = "setuptools.build_meta"
 
@@ -12,7 +12,7 @@ build-backend = "setuptools.build_meta"
 name = "rslib"
 authors = [{ name="Luca Zoffoli", email="lzoffoli@technogym.com" }]
 description = "A small package to simplify data processing in python."
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
