@@ -21,6 +21,10 @@ get_files
 assert_file_extension
     check the validity of the input path file to be a str with the provided
     extension.
+
+split_data
+    get the indices randomly separating the input data into subsets according
+    to the given proportions.
 """
 
 
@@ -34,7 +38,13 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-__all__ = ["Participant", "magnitude", "get_files", "assert_file_extension"]
+__all__ = [
+    "Participant",
+    "magnitude",
+    "get_files",
+    "assert_file_extension",
+    "split_data",
+]
 
 
 #! CLASSES
@@ -439,3 +449,58 @@ def assert_file_extension(
     assert isinstance(path, str), "path must be a str object."
     assert os.path.exists(path), path + " does not exist."
     assert path[-4:] == f".{ext}", path + f' must be an ".{ext}" path.'
+
+
+def split_data(
+    data: np.ndarray[Any, np.dtype[np.float_]],
+    proportion: dict[str, float],
+    groups: int,
+):
+    """
+    get the indices randomly separating the input data into subsets according
+    to the given proportions.
+
+    Note
+    ----
+    the input array is firstly divided into quantiles according to the groups
+    argument. Then the indices are randomly drawn from each subset according
+    to the entered proportions. This ensures that the resulting groups
+    will mimic the same distribution of the input data.
+
+    Parameters
+    ----------
+    data : np.ndarray[Any, np.dtype[np.float_]]
+        a 1D input array
+
+    proportion : dict[str, float]
+        a dict where each key contains the proportion of the total samples
+        to be given. The proportion must be a value within the (0, 1] range
+        and the sum of all entered proportions must be 1.
+
+    groups : int
+        the number of quantilic groups to be used.
+
+    Returns
+    -------
+    splits: dict[str, np.ndarray[Any, np.dtype[np.int_]]]
+        a dict with the same keys of proportion, which contains the
+        corresponding indices.
+    """
+
+    # get the grouped data by quantiles
+    qnts = np.quantile(data, np.linspace(0, 1, groups))
+    grps = np.digitize(data, qnts, right=True)
+    idxs = np.arange(len(data))
+    grps = [idxs[grps == i] for i in np.arange(groups)]
+
+    # split each group
+    dss = {i: [] for i in proportion.keys()}
+    bins = np.cumsum(list(proportion.values()))
+    for grp in grps:
+        props = np.linspace(0, 1, len(grp))
+        samples = np.digitize(props, bins, right=True)
+        arr = np.random.permutation(grp)
+        for i, key in enumerate(list(proportion.keys())):
+            dss[key] += [arr[samples == i]]
+
+    return {i: np.concatenate(v) for i, v in dss.items()}
