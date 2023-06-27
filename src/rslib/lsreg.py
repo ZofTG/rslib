@@ -49,7 +49,7 @@ ExponentialRegression
     and x is a 1D variables.
 
 
-EllipsisRegression
+EllipseRegression
     Regression tool fitting an ellipse in a 2D space
 
 
@@ -61,7 +61,7 @@ CircleRegression
 #! IMPORTS
 
 
-from typing import Union
+from typing import Any, Union
 import numpy as np
 import pandas as pd
 
@@ -72,7 +72,7 @@ __all__ = [
     "PowerRegression",
     "HyperbolicRegression",
     "ExponentialRegression",
-    "EllipsisRegression",
+    "EllipseRegression",
     "CircleRegression",
 ]
 
@@ -235,18 +235,68 @@ class LinearRegression:
             self._add_intercept(v)
         return v.values @ self.betas
 
-    @property
-    def r_squared(self):
+    def r_squared(
+        self,
+        y: Union[np.ndarray[Any, np.dtype[np.float_]], pd.DataFrame, list, int, float, None,] = None,
+        x: Union[np.ndarray[Any, np.dtype[np.float_]], pd.DataFrame, list, int, float, None,] = None,
+    ):
         """
         return the calculated R-squared for the given model.
+
+        Parameters
+        ----------
+        y: Union[np.ndarray, pd.DataFrame, list, int, float, None]
+            the y data
+
+        x: Union[np.ndarray, pd.DataFrame, list, int, float, None]
+            the x data
+
         Returns
         -------
         r2: float
             the calculated r-squared.
         """
-        z = self(self.x)
-        m = pd.concat([self.y, z], axis=1)
-        return m.corr("pearson").values[0, 1] ** 2
+        if x is None:
+            x_ = self.x
+        else:
+            x_ = self._simplify(x)
+        if y is None:
+            y_ = self.y
+        else:
+            y_ = self._simplify(y)
+        if not x_.shape[0] == y_.shape[0]:
+            raise ValueError("x and y must have the same number of samples.")
+        z_ = self(x_)
+        num = ((y_ - z_) ** 2).sum(axis=0)
+        den = ((y_ - np.mean(y_, axis=0)) ** 2).sum(axis=0)
+        return 1 - num / den
+
+
+    def r_squared_adj(
+        self,
+        y: Union[np.ndarray[Any, np.dtype[np.float_]], pd.DataFrame, list, int, float, None,] = None,
+        x: Union[np.ndarray[Any, np.dtype[np.float_]], pd.DataFrame, list, int, float, None,] = None,
+    ):
+        """
+        return the calculated adjusted R-squared for the given model.
+
+        Parameters
+        ----------
+        y: Union[np.ndarray, pd.DataFrame, list, int, float, None]
+            the y data
+
+        x: Union[np.ndarray, pd.DataFrame, list, int, float, None]
+            the x data
+
+        Returns
+        -------
+        r2_adj: float
+            the calculated r-squared.
+        """
+        r2 = self.r_squared(y, x)
+        n = self._simplify(x).shape[0]
+        p = np.prod(self.betas.shape)
+        return 1 - (n - 1) / (n - p - 1) * (1 - r2)
 
 
 class PolynomialRegression(LinearRegression):
@@ -457,7 +507,7 @@ class ExponentialRegression(LinearRegression):
     """
     Obtain the regression coefficients according to the exponential function:
 
-                            y = a * BASE ** x + b
+                            y = beta0 + beta1 * BASE ** x
 
     Parameters
     ----------
@@ -529,9 +579,9 @@ class _Axis(LinearRegression):
         assert self.x.shape[0] == 2, txt
 
         # set the vertex
-        x = self.x.values.flatten().astype(float)
-        y = self.y.values.flatten().astype(float)
-        self._vertex = ((x[0], y[0]), (x[1], y[1]))
+        x_ = self.x.values.flatten().astype(float)
+        y_ = self.y.values.flatten().astype(float)
+        self._vertex = ((x_[0], y_[0]), (x_[1], y_[1]))
 
     @property
     def angle(self):
@@ -556,7 +606,7 @@ class _Axis(LinearRegression):
         return self._vertex
 
 
-class EllipsisRegression(LinearRegression):
+class EllipseRegression(LinearRegression):
     """
     calculate the beta coefficients equivalent to the fit the coefficients
     eiv_pos,b,cnd,d,e,f, representing an ellipse described by the formula
@@ -607,7 +657,7 @@ class EllipsisRegression(LinearRegression):
         Note
         ----
         only x or y can be provided. None is returned if the provided value
-        lies outside the ellipsis boundaries.
+        lies outside the Ellipse boundaries.
         """
         # check the entries
         assert x is not None or y is not None, "'x' or 'y' must be provided."
@@ -674,7 +724,7 @@ class EllipsisRegression(LinearRegression):
             raise ValueError("m0 = 0.")
         m1 = -1 / m0
 
-        # We know that the two axes pass from the centre of the ellipsis
+        # We know that the two axes pass from the centre of the Ellipse
         # and we also know the angle of the major and minor axes.
         # Therefore the intercept of the fitting lines describing the two
         # axes can be found.
@@ -682,7 +732,7 @@ class EllipsisRegression(LinearRegression):
         i0 = y0 - x0 * m0
         i1 = y0 - x0 * m1
 
-        # get the crossings between the two axes and the ellipsis
+        # get the crossings between the two axes and the Ellipse
         p0_0, p0_1 = self.get_crossings(m=m0, i=i0)
         p1_0, p1_1 = self.get_crossings(m=m1, i=i1)
 
@@ -704,7 +754,7 @@ class EllipsisRegression(LinearRegression):
         i: Union[int, float],
     ):
         """
-        get the crossings between the provided line and the ellipsis
+        get the crossings between the provided line and the Ellipse
 
         Parameters
         ----------
@@ -718,7 +768,7 @@ class EllipsisRegression(LinearRegression):
         -------
         p0, p1: tuple
             the coordinates of the crossing points. It returns None if
-            the line does not touch the ellipsis.
+            the line does not touch the Ellipse.
         """
         a, b, c, d, e, f = self.betas.values.flatten()
         a_ = a + b * m + c * m**2
@@ -809,7 +859,7 @@ class EllipsisRegression(LinearRegression):
         y: Union[int, float],
     ):
         """
-        check whether the point (x, y) is inside the ellipsis.
+        check whether the point (x, y) is inside the Ellipse.
 
         Parameters
         ----------
@@ -822,7 +872,7 @@ class EllipsisRegression(LinearRegression):
         Returns
         -------
         i: bool
-            True if the provided point is contained by the ellipsis.
+            True if the provided point is contained by the Ellipse.
         """
         y0, y1 = self(x=x).values.flatten()
         return bool((y0 is not None) & (y > min(y0, y1)) & (y <= max(y0, y1)))
@@ -830,13 +880,13 @@ class EllipsisRegression(LinearRegression):
     @property
     def center(self):
         """
-        get the center of the ellipsis as described here:
+        get the center of the Ellipse as described here:
         https://mathworld.wolfram.com/Ellipse.html
 
         Returns
         -------
         x0, y0: float
-            the coordinates of the centre of the ellipsis.
+            the coordinates of the centre of the Ellipse.
         """
         a, b, c, d, e = self.betas.values.flatten()[:-1]
         den = b**2 - 4 * a * c
@@ -847,19 +897,19 @@ class EllipsisRegression(LinearRegression):
     @property
     def area(self):
         """
-        the area of the ellipsis.
+        the area of the Ellipse.
 
         Returns
         -------
         a: float
-            the area of the ellipsis.
+            the area of the Ellipse.
         """
         return float(np.pi * self.axis_major.length * self.axis_minor.length)
 
     @property
     def perimeter(self):
         """
-        the (approximated) perimeter of the ellipsis as calculated
+        the (approximated) perimeter of the Ellipse as calculated
         by the "infinite series approach".
                 P = pi * (a + b) * sum_{n=0...N} (h ** n / (4 ** (n + 1)))
         where:
@@ -876,7 +926,7 @@ class EllipsisRegression(LinearRegression):
         Returns
         -------
         p: float
-            the approximated perimeter of the ellipsis.
+            the approximated perimeter of the ellipse.
         """
         a = self.axis_major.length / 2
         b = self.axis_minor.length / 2
@@ -899,7 +949,7 @@ class EllipsisRegression(LinearRegression):
     @property
     def eccentricity(self):
         """
-        return the eccentricity parameter of the ellipsis.
+        return the eccentricity parameter of the ellipse.
         """
         b = self.axis_minor.length / 2
         a = self.axis_major.length / 2
@@ -916,7 +966,7 @@ class EllipsisRegression(LinearRegression):
         -------
         f0, f1: tuple
             the coordinates of the crossing points. It returns None if
-            the line does not touch the ellipsis.
+            the line does not touch the ellipse.
         """
         a = self.axis_major.length / 2
         p = self.axis_major.angle
@@ -1067,7 +1117,7 @@ class CircleRegression(LinearRegression):
         Note
         ----
         only x or y can be provided. None is returned if the provided value
-        lies outside the ellipsis boundaries.
+        lies outside the ellipse boundaries.
         """
         # check the entries
         assert x is not None or y is not None, "'x' or 'y' must be provided."
@@ -1091,7 +1141,7 @@ class CircleRegression(LinearRegression):
         y: Union[int, float],
     ):
         """
-        check whether the point (x, y) is inside the ellipsis.
+        check whether the point (x, y) is inside the ellipse.
 
         Parameters
         ----------
@@ -1104,7 +1154,7 @@ class CircleRegression(LinearRegression):
         Returns
         -------
         i: bool
-            True if the provided point is contained by the ellipsis.
+            True if the provided point is contained by the ellipse.
         """
         y0, y1 = self(x=x).values.flatten()
         return bool((y0 is not None) & (y > min(y0, y1)) & (y <= max(y0, y1)))
