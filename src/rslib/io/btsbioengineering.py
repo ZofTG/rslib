@@ -723,7 +723,7 @@ def _read_platforms_calibration(
     fid, block = _get_block(fid, blocks, 8)
     if len(block) == 0:
         return None
-    nplats, ncams, freq = struct.unpack("iii", fid.read(16))
+    nplats, ncams, freq, = struct.unpack("iii", fid.read(12))
     fid.seek(4, 1)
 
     # channels map
@@ -747,7 +747,7 @@ def _read_platforms_calibration(
     for plt in plat_map:
         obj = {}
         obj["CHANNEL"] = plt
-        label = _get_label(fid.read(32))
+        label = _get_label(fid.read(256))
         frames = struct.unpack("i", fid.read(4))[0]
         obj["SIZE"] = np.array(struct.unpack("ff", fid.read(8)))
         obj["SIZE"] = obj["SIZE"].astype(np.float32)

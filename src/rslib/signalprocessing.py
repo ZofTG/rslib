@@ -55,6 +55,9 @@ crossings
 
 xcorr
     get the cross/auto-correlation and lag of of multiple/one 1D signal.
+
+outlyingness
+    return the adsjusted outlyingness factor.
 """
 
 
@@ -85,6 +88,7 @@ __all__ = [
     "psd",
     "crossings",
     "xcorr",
+    "outlyingness",
 ]
 
 
@@ -1135,3 +1139,50 @@ def xcorr(
 
     # return the cross-correlation data
     return xcr.astype(float), lags.astype(int)
+
+
+def outlyingness(
+    arr: np.ndarray[Any, np.dtype[np.float_]],
+):
+    """
+    return the adsjusted outlyingness factor.
+
+    Parameters
+    ----------
+    arr: np.ndarray[Any, np.dtype[np.float_]]
+        the input array
+
+    Returns
+    -------
+    out: np.ndarray[Any, np.dtype[np.float_]]
+        the outlyingness score of each element
+
+    References
+    ----------
+    Hubert, M., & Van der Veeken, S. (2008).
+        Outlier detection for skewed data.
+        Journal of Chemometrics: A Journal of the Chemometrics Society,
+        22(3‐4), 235-246.
+    """
+    qr1, med, qr3 = np.percentile(arr, [0.25, 0.50, 0.75])
+    iqr = qr3 - qr1
+    mad = np.median(abs(arr - med))
+    low = arr[arr < med]
+    upp = arr[arr > med]
+    mcs = [((j - med) - (med - i)) / (j - i) for i, j in product(low, upp)]
+    mcs = np.median(mcs)
+    if mcs > 0:
+        wt1 = qr1 - 1.5 * np.e ** (-4 * mcs) * iqr
+        wt2 = qr3 + 1.5 * np.e ** (3 * mcs) * iqr
+    else:
+        wt1 = qr1 - 1.5 * np.e ** (-3 * mcs) * iqr
+        wt2 = qr3 + 1.5 * np.e ** (4 * mcs) * iqr
+    out = []
+    for i in arr:
+        if i == med:
+            out += [0]
+        elif i > med:
+            out += [(i - med) / (wt2 - med)]
+        else:
+            out += [(med - i) / (med - wt1)]
+    return np.array(out)

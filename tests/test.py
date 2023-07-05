@@ -18,16 +18,16 @@ from rslib import *
 if __name__ == "__main__":
     # io
     print("TESTING TDF DATA READING")
-    tdf_data = read_tdf("tdf_sample.tdf")
+    tdf_data = read_tdf("tests/tdf_sample.tdf")
     print(tdf_data)
     print("")
 
     print("TESTING EMT DATA READING")
-    emt_data = read_emt("emt_sample.emt")
+    emt_data = read_emt("tests/emt_sample.emt")
     print(emt_data)
     print("")
 
     print("TESTING COSMED XLSX DATA READING")
-    cosmed_data, participant = read_cosmed_xlsx("cosmed_sample.xlsx")
+    cosmed_data, participant = read_cosmed_xlsx("tests/cosmed_sample.xlsx")
     print(cosmed_data)
     print(participant)
