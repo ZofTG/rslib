@@ -1,3 +1,3 @@
-pandas==2.0.2
-scipy==1.10.1
-openpyxl==3.1.2
+pandas
+scipy
+openpyxl
