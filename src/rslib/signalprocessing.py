@@ -1166,7 +1166,6 @@ def outlyingness(
     """
     qr1, med, qr3 = np.percentile(arr, [0.25, 0.50, 0.75])
     iqr = qr3 - qr1
-    mad = np.median(abs(arr - med))
     low = arr[arr < med]
     upp = arr[arr > med]
     mcs = [((j - med) - (med - i)) / (j - i) for i, j in product(low, upp)]

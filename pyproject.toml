@@ -5,6 +5,7 @@ requires = [
     "pandas",
     "scipy",
     "openpyxl",
+    "scikit-learn",
 ]
 build-backend = "setuptools.build_meta"
 
@@ -18,7 +19,7 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
-version = "2"
+version = "3"
 dynamic = ["readme", "dependencies"]
 
 [tool.setuptools.dynamic]

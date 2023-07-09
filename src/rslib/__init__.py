@@ -11,6 +11,9 @@ io
     such as BtsBioengineering tdf and emt formats or Cosmed-formatted xlsx
     files
 
+regression
+    a library wrapping scikit-learn regression estimators.
+
 Modules
 -------
 signalprocessing
@@ -23,4 +26,4 @@ utils
 from .io import *
 from .signalprocessing import *
 from .utils import *
-from .lsreg import *
+from .regression import *
