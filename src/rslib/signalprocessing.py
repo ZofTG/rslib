@@ -758,9 +758,10 @@ def cubicspline_interp(
     """
 
     # control of the inputs
-    if nsamp is not None:
+    if nsamp is None:
         if x_old is None or x_new is None:
             raise ValueError("the pair x_old / x_new or nsamp must be defined")
+    else:
         x_old = np.arange(len(y_old))  # type: ignore
         x_new = np.linspace(np.min(x_old), np.max(x_old), nsamp)  # type: ignore
 

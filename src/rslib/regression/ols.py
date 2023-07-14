@@ -219,7 +219,10 @@ class LinearRegression(LReg, TransformerMixin):
             columns=self.feature_names_in_,
         )
 
-    def get_feature_names_out(self):
+    def get_feature_names_out(
+        self,
+        input_features=None,
+    ):
         """return the names of the fitted values"""
         return self._names
 
@@ -247,6 +250,7 @@ class LinearRegression(LReg, TransformerMixin):
         X: np.ndarray | pd.DataFrame | list | int | float,
         y: np.ndarray | pd.DataFrame | list | int | float,
         sample_weight: np.ndarray|pd.DataFrame|list|int|float|None=None,
+        **kwargs,
     ):
         """
         Fit the model and return the predicted outcomes.
