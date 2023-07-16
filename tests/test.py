@@ -18,7 +18,8 @@ from rslib import *
 if __name__ == "__main__":
     # io
     print("TESTING TDF DATA READING")
-    tdf_data = read_tdf("tests/tdf_sample.tdf")
+    # tdf_data = read_tdf("tests/tdf_sample.tdf")
+    tdf_data = read_tdf("tests/tdf_sample_2.tdf")
     print(tdf_data)
     print("")
 

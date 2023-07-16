@@ -1232,20 +1232,20 @@ def read_tdf(
             next_entry_offset = 272
 
         # read all entries
-        tdf["VOLUME"] = _read_volume(fid, blocks)
-        tdf["DATA_CALIBRATION_GENERIC"] = _read_calibration_generic(fid, blocks)
+        tdf["CAMERA_RAW"] = _read_camera_raw(fid, blocks)
+        tdf["CAMERA_TRACKED"] = _read_camera_tracked(fid, blocks)
         tdf["CAMERA_PARAMS"] = _read_camera_params(fid, blocks)
         tdf["CAMERA_CALIBRATION"] = _read_camera_calibration(fid, blocks)
         tdf["CAMERA_CONFIGURATION"] = _read_camera_configuration(fid, blocks)
+        tdf["PLATFORMS_RAW"] = _read_platforms_raw(fid, blocks)
+        tdf["PLATFORMS_TRACKED"] = _read_platforms_tracked(fid, blocks)
         tdf["PLATFORMS_PARAMETERS"] = _read_platforms_params(fid, blocks)
         tdf["PLATFORMS_CALIBRATION"] = _read_platforms_calibration(fid, blocks)
-        tdf["PLATFORMS_RAW"] = _read_platforms_raw(fid, blocks)
-        tdf["CAMERA_RAW"] = _read_camera_raw(fid, blocks)
-        tdf["CAMERA_TRACKED"] = _read_camera_tracked(fid, blocks)
         tdf["DATA_GENERIC"] = _read_data_generic(fid, blocks)
+        tdf["DATA_CALIBRATION_GENERIC"] = _read_calibration_generic(fid, blocks)
         tdf["EMG"] = _read_emg(fid, blocks)
-        tdf["PLATFORMS_TRACKED"] = _read_platforms_tracked(fid, blocks)
         tdf["EVENTS"] = _read_events(fid, blocks)
+        tdf["VOLUME"] = _read_volume(fid, blocks)
 
     except Exception as exc:
         raise RuntimeError(exc) from exc
