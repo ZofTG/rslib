@@ -58,6 +58,10 @@ xcorr
 
 outlyingness
     return the adsjusted outlyingness factor.
+
+gram_schmidt
+    return the orthogonal basis defined by a set of points using the
+    Gram-Schmidt algorithm.
 """
 
 
@@ -89,6 +93,7 @@ __all__ = [
     "crossings",
     "xcorr",
     "outlyingness",
+    "gram_schmidt",
 ]
 
 
@@ -1186,3 +1191,33 @@ def outlyingness(
         else:
             out += [(med - i) / (med - wt1)]
     return np.array(out)
+
+
+def gram_schmidt(
+    points: np.ndarray[Any, np.dtype[np.float_]],
+):
+    """
+    Return the orthogonal basis defined by a set of points using the
+    Gram-Schmidt algorithm.
+
+    Parameters
+    ----------
+    points: np.ndarray[Any, np.dtype[np.float_]]
+        a NxN numpy.ndarray to be orthogonalized (by row).
+
+    Returns
+    -------
+    ortho: np.ndarray[Any, np.dtype[np.float_]]
+        a NxN numpy.ndarray containing the orthogonalized arrays.
+    """
+
+    # calculate the projection points
+    w_mat = []
+    for i, u in enumerate(points):
+        w_arr = np.copy(u).astype(np.float32)
+        for j in points[:i, :]:
+            w_arr -= np.inner(u, j) / np.inner(j, j) * j
+        w_mat += [w_arr]
+
+    # normalize
+    return np.vstack([v / np.sqrt(np.sum(v**2)) for v in w_mat])
