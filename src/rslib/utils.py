@@ -18,10 +18,6 @@ get_files
     get the full path of the files contained within the provided folder
     (and optionally subfolders) having the provided extension.
 
-assert_file_extension
-    check the validity of the input path file to be a str with the provided
-    extension.
-
 split_data
     get the indices randomly separating the input data into subsets according
     to the given proportions.
@@ -42,7 +38,6 @@ __all__ = [
     "Participant",
     "magnitude",
     "get_files",
-    "assert_file_extension",
     "split_data",
 ]
 
@@ -422,33 +417,6 @@ def get_files(
 
     # return the output
     return out
-
-
-def assert_file_extension(
-    path: Any,
-    ext: str,
-):
-    """
-    check the validity of the input path file to be a str with the provided
-    extension.
-
-    Parameters
-    ----------
-    path : Any
-        the object to be checked
-
-    ext : str
-        the target file extension
-
-    Raises
-    ------
-    err: AsserttionError
-        in case the file is not a str or it does not exist or it does not have
-        the provided extension.
-    """
-    assert isinstance(path, str), "path must be a str object."
-    assert os.path.exists(path), path + " does not exist."
-    assert path[-4:] == f".{ext}", path + f' must be an ".{ext}" path.'
 
 
 def split_data(

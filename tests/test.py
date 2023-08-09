@@ -1,34 +1,26 @@
-"""rslib testing module"""
+"""test the rslib library"""
+
 
 #! IMPORTS
 
 
-from os.path import dirname, join
+from os.path import dirname
 import sys
 
-sys.path += [dirname(__file__)]
-sys.path += [join(dirname(dirname(__file__)), "src")]
+sys.path += [dirname(dirname(__file__))]
+from tests import *
 
-from rslib import *
+
+#! FUNCTIONS
+
+
+def test_all():
+    """test all rslib functionalities"""
+    test_io()
 
 
 #! MAIN
 
 
 if __name__ == "__main__":
-    # io
-    print("TESTING TDF DATA READING")
-    # tdf_data = read_tdf("tests/tdf_sample.tdf")
-    tdf_data = read_tdf("tests/tdf_sample_2.tdf")
-    print(tdf_data)
-    print("")
-
-    print("TESTING EMT DATA READING")
-    emt_data = read_emt("tests/emt_sample.emt")
-    print(emt_data)
-    print("")
-
-    print("TESTING COSMED XLSX DATA READING")
-    cosmed_data, participant = read_cosmed_xlsx("tests/cosmed_sample.xlsx")
-    print(cosmed_data)
-    print(participant)
+    test_all()

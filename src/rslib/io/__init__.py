@@ -1,18 +1,17 @@
 """
-io
+io.read
 
-a library containing functions to read specifically formatted files such
-as BtsBioengineering tdf and emt formats or Cosmed-formatted xlsx files
+a library containing functions to read and write specifically formatted files
+such as BtsBioengineering tdf and emt formats or Cosmed-formatted xlsx files
 
 Modules
 -------
-btsbioengineering
-    read specific BtsBioengineering file formats such as .tdf and .emt
-    extensions.
+read
+    module containing reading functions
 
-cosmed
-    read .xlsx files generated trough the Cosmed Omnia software.
+write
+    module containing writing functions
 """
 
-from .btsbioengineering import *
-from .cosmed import *
+from .read import *
+from .write import *
