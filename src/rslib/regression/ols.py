@@ -488,129 +488,6 @@ class PolynomialRegression(LinearRegression):
         return super().predict(X=self._adjust_degree(X))
 
 
-class ExponentialRegression(LinearRegression):
-    """
-    Regression model having form:
-
-                y = e ** (b0 + b1 * X1 + ... + Bn * Xn)
-
-    Parameters
-    ----------
-    fit_intercept : bool, default=True
-        Whether to calculate the intercept for this model. If set to False,
-        no intercept will be used in calculations
-        (i.e. data is expected to be centered).
-
-    copy_X : bool, default=True
-        If True, X will be copied; else, it may be overwritten.
-
-    n_jobs : int, default=None
-        The number of jobs to use for the computation. This will only provide
-        speedup in case of sufficiently large problems, that is if firstly
-        n_targets > 1 and secondly X is sparse or if positive is set to True.
-        None means 1 unless in a joblib.parallel_backend context. -1 means
-        using all processors. See Glossary for more details.
-
-    positive : bool, default=False
-        When set to True, forces the coefficients to be positive.
-        This option is only supported for dense arrays.
-
-    Attributes
-    ----------
-    betas: pandas DataFrame
-        a dataframe reporting the regression coefficients for each feature
-
-    coef_: array of shape (n_features, ) or (n_targets, n_features)
-        Estimated coefficients for the linear regression problem.
-        If multiple targets are passed during the fit (y 2D), this is a
-        2D array of shape (n_targets, n_features), while if only one target
-        is passed, this is a 1D array of length n_features.
-
-    rank_: int
-        Rank of matrix X. Only available when X is dense.
-
-    singular: _array of shape (min(X, y),)
-        Singular values of X. Only available when X is dense.
-
-    intercept_: float or array of shape (n_targets,)
-        Independent term in the linear model.
-        Set to 0.0 if fit_intercept = False.
-
-    n_features_in_: int
-        Number of features seen during fit.
-
-    feature_names_in_: ndarray of shape (n_features_in_,)
-        Names of features seen during fit.
-    """
-
-    _domain = (0, np.inf)
-    _codomain = (-np.inf, np.inf)
-
-    def __init__(
-        self,
-        fit_intercept: bool = True,
-        copy_X: bool = True,
-        n_jobs: int = 1,
-        positive: bool = False,
-    ):
-        super().__init__(
-            fit_intercept=fit_intercept,
-            copy_X=copy_X,
-            n_jobs=n_jobs,
-            positive=positive,
-        )
-
-    def fit(
-        self,
-        X: np.ndarray | pd.DataFrame | list | int | float,
-        y: np.ndarray | pd.DataFrame | list | int | float,
-        sample_weight: np.ndarray | pd.DataFrame | list | int | float | None = None,
-    ):
-        """
-        Fit the model.
-
-        Parameters
-        ----------
-        X: array-like or DataFrame of shape (n_samples, n_features)
-            Training data.
-
-        y: array-like or DataFrame of shape (n_samples,)|(n_samples, n_targets)
-            Target values. Will be cast to X’s dtype if necessary.
-
-        sample_weight: array-like of shape (n_samples,), default=None
-            Individual weights for each sample.
-
-        Returns
-        -------
-        self
-            the fitted estimator
-        """
-        return super().fit(
-            X=self._simplify(X, "X").applymap(np.log),
-            y=self._simplify(y, "Y").applymap(np.log).values.astype(float),
-            sample_weight=sample_weight,
-        )
-
-    def predict(
-        self,
-        X: np.ndarray | pd.DataFrame | list | int | float,
-    ):
-        """
-        Fit the model.
-
-        Parameters
-        ----------
-        X: array-like or DataFrame of shape (n_samples, n_features)
-            Training data.
-
-        Returns
-        -------
-        z: DataFrame
-            the predicted values.
-        """
-        return np.e ** super().predict(X)
-
-
 class PowerRegression(LinearRegression):
     """
     Regression model having form:
@@ -843,7 +720,7 @@ class HyperbolicRegression(LinearRegression):
             the fitted estimator
         """
         return super().fit(
-            X=self._simplify(X, "X") ** (-1),
+            X=self._simplify(X, "X").applymap(lambda x: x**-1),
             y=self._simplify(y, "Y").values.astype(float),
             sample_weight=sample_weight,
         )
@@ -865,7 +742,7 @@ class HyperbolicRegression(LinearRegression):
         z: DataFrame
             the predicted values.
         """
-        return super().predict(self._simplify(X) ** (-1))
+        return super().predict(self._simplify(X, "X").applymap(lambda x: x**-1))
 
 
 class ExponentialRegression(LinearRegression):
@@ -983,7 +860,7 @@ class ExponentialRegression(LinearRegression):
             the fitted estimator
         """
         return super().fit(
-            X=self.base ** self._simplify(X, "X"),
+            X=self._simplify(X, "X").applymap(lambda x: self.base**x),
             y=self._simplify(y, "Y").values.astype(float),
             sample_weight=sample_weight,
         )
@@ -1005,7 +882,8 @@ class ExponentialRegression(LinearRegression):
         z: DataFrame
             the predicted values.
         """
-        return super().predict(self.base ** self._simplify(X))
+        XX = self._simplify(X, "X").applymap(lambda x: self.base**x)
+        return super().predict(XX)
 
 
 class EllipseRegression(LinearRegression):
