@@ -146,13 +146,13 @@ class LinearRegression(LReg, TransformerMixin):
         """
         representation of the object.
         """
-        return self.coefs.__repr__()
+        return self.betas.__repr__()
 
     def __str__(self):
         """
         representation of the object.
         """
-        return self.coefs.__str__()
+        return self.betas.__str__()
 
     def _simplify(
         self,
@@ -209,9 +209,9 @@ class LinearRegression(LReg, TransformerMixin):
         return self._codomain
 
     @property
-    def coefs(self):
+    def betas(self):
         """return the beta coefficients of the model"""
-        rows = self.coef_.shape[1] + (1 if self.fit_intercept else 0)
+        rows = len(self.feature_names_in_) + (1 if self.fit_intercept else 0)
         names = np.unique([i.split("^")[0] for i in self.feature_names_in_])
         cols = len(names)
         betas = np.zeros((rows, cols))
@@ -979,7 +979,7 @@ class EllipseRegression(LinearRegression):
 
         # get the axes angles
         # ref: http://www.geom.uiuc.edu/docs/reference/CRC-formulas/node28.html
-        a, c, b = self.coefs.values.flatten()[:3]
+        a, c, b = self.betas.values.flatten()[:3]
 
         # get the axes angles
         if c == 0:
@@ -1082,7 +1082,7 @@ class EllipseRegression(LinearRegression):
             the coordinates of the crossing points. It returns None if
             the line does not touch the Ellipse.
         """
-        a, b, c, d, e, f = self.coefs.values.flatten()
+        a, b, c, d, e, f = self.betas.values.flatten()
         a_ = a + b * m + c * m**2
         b_ = b * i + 2 * m * i * c + d + e * m
         c_ = c * i**2 + e * i + f
@@ -1152,7 +1152,7 @@ class EllipseRegression(LinearRegression):
             is impossible.
         """
         # get the coefficients
-        a_, b_, c_, d_, e_, f_ = self.coefs.values.flatten()
+        a_, b_, c_, d_, e_, f_ = self.betas.values.flatten()
         if y is not None and x is None:
             y_ = float(y)
             a, b, c = a_, b_ * y_ + d_, f_ + c_ * y_**2 + e_ * y_
@@ -1215,7 +1215,7 @@ class EllipseRegression(LinearRegression):
         x0, y0: float
             the coordinates of the centre of the Ellipse.
         """
-        a, b, c, d, e = self.coefs.values.flatten()[:-1]
+        a, b, c, d, e = self.betas.values.flatten()[:-1]
         den = b**2 - 4 * a * c
         x = float((2 * c * d - b * e) / den)
         y = float((2 * a * e - b * d) / den)
@@ -1315,7 +1315,7 @@ class EllipseRegression(LinearRegression):
         """
 
         # get the roots to for the 2nd order equation to be solved
-        a_, b_, c_, d_, e_, f_ = self.coefs.values.flatten()
+        a_, b_, c_, d_, e_, f_ = self.betas.values.flatten()
         a = b_**2 - 4 * a_ * c_
         b = 2 * b_ * e_ - 4 * c_ * d_
         c = e_**2 - 4 * c_ * f_
@@ -1335,7 +1335,7 @@ class EllipseRegression(LinearRegression):
             the y-axis boundaries of the ellipse.
         """
         # get the roots to for the 2nd order equation to be solved
-        a_, b_, c_, d_, e_, f_ = self.coefs.values.flatten()
+        a_, b_, c_, d_, e_, f_ = self.betas.values.flatten()
         a = b_**2 - 4 * a_ * c_
         b = 2 * b_ * d_ - 4 * a_ * e_
         c = d_**2 - 4 * a_ * f_
@@ -1523,7 +1523,7 @@ class CircleRegression(LinearRegression):
         r: float
             the radius of the circle.
         """
-        a, b, c = self.coefs.values.flatten()
+        a, b, c = self.betas.values.flatten()
         return float((4 * c + a**2 + b**2) ** 0.5) * 0.5
 
     @property
@@ -1536,7 +1536,7 @@ class CircleRegression(LinearRegression):
         x0, y0: float
             the coordinates of the centre of the cicle.
         """
-        a, b = self.coefs.values.flatten()[:-1]
+        a, b = self.betas.values.flatten()[:-1]
         return float(a * 0.5), float(b * 0.5)
 
     @property
