@@ -15,11 +15,6 @@ PolynomialRegression
             Y = b0 + b1 * X**1 + ... + bn * X**n + e
 
 
-ExponentialRegression
-    regression model in the form:
-            Y = e ** (b0 + b1 * X1 + ... + bn * Xn) + e
-
-
 PowerRegression
     regression model having form:
             Y = b0 * X1 ** b1 * ... + Xn ** bn + e
@@ -29,7 +24,10 @@ HyperbolicRegression
     Regression tool fitting the model
             Y = b0 + b1/X1 + ... + bn/Xn + e
 
-    where a and b are the estimated coefficients and x is a 1D variables.
+
+ExponentialRegression
+    Ordinary Least Squares regression model in the form:
+            Y = b0 + b1 * k**X1 + ... + bn * k**Xn + e
 
 
 EllipseRegression
@@ -132,10 +130,10 @@ class LinearRegression(LReg, TransformerMixin):
 
     def __init__(
         self,
-        fit_intercept:bool=True,
-        copy_X:bool=True,
-        n_jobs:int=1,
-        positive:bool=False,
+        fit_intercept: bool = True,
+        copy_X: bool = True,
+        n_jobs: int = 1,
+        positive: bool = False,
     ):
         super().__init__(
             fit_intercept=fit_intercept,
@@ -213,10 +211,16 @@ class LinearRegression(LReg, TransformerMixin):
     @property
     def betas(self):
         """return the beta coefficients of the model"""
+        rows = self.coef_.shape[1] + (1 if self.fit_intercept else 0)
+        names = np.unique([i.split("^")[0] for i in self.feature_names_in_])
+        cols = len(names)
+        betas = np.zeros((rows, cols))
+        betas[0, 0] = self.intercept_
+        betas[1:, :] = np.atleast_2d(self.coef_).T
         return pd.DataFrame(
-            data=[self.intercept_] + self.coef_.tolist(),
-            index=[f"beta{i}" for i in np.arange(len(self.coef_) + 1)],
-            columns=self.feature_names_in_,
+            data=betas,
+            index=[f"beta{i}" for i in np.arange(rows)],
+            columns=names,
         )
 
     def get_feature_names_out(
@@ -249,7 +253,7 @@ class LinearRegression(LReg, TransformerMixin):
         self,
         X: np.ndarray | pd.DataFrame | list | int | float,
         y: np.ndarray | pd.DataFrame | list | int | float,
-        sample_weight: np.ndarray|pd.DataFrame|list|int|float|None=None,
+        sample_weight: np.ndarray | pd.DataFrame | list | int | float | None = None,
         **kwargs,
     ):
         """
@@ -277,7 +281,7 @@ class LinearRegression(LReg, TransformerMixin):
         self,
         X: np.ndarray | pd.DataFrame | list | int | float,
         y: np.ndarray | pd.DataFrame | list | int | float,
-        sample_weight: np.ndarray|pd.DataFrame|list|int|float|None=None,
+        sample_weight: np.ndarray | pd.DataFrame | list | int | float | None = None,
     ):
         """
         Fit the model.
@@ -389,15 +393,15 @@ class PolynomialRegression(LinearRegression):
 
     _domain = (-np.inf, np.inf)
     _codomain = (-np.inf, np.inf)
-    degree:int
+    degree: int
 
     def __init__(
         self,
-        degree:int=1,
-        fit_intercept:bool=True,
-        copy_X:bool=True,
-        n_jobs:int=1,
-        positive:bool=False,
+        degree: int = 1,
+        fit_intercept: bool = True,
+        copy_X: bool = True,
+        n_jobs: int = 1,
+        positive: bool = False,
     ):
         super().__init__(
             fit_intercept=fit_intercept,
@@ -409,7 +413,7 @@ class PolynomialRegression(LinearRegression):
 
     def _adjust_degree(
         self,
-        X:np.ndarray | pd.DataFrame | list | int | float,
+        X: np.ndarray | pd.DataFrame | list | int | float,
     ):
         """
         prepare the input to the fit and predict methods
@@ -428,7 +432,7 @@ class PolynomialRegression(LinearRegression):
         col = XX.columns
         XXn = []
         for i in np.arange(1, self.degree) + 1:
-            dfn = XX ** i
+            dfn = XX**i
             dfn.columns = pd.Index([f"{j}^{i}" for j in col])
             XXn += [dfn]
         return pd.concat([XX] + XXn, axis=1)
@@ -437,7 +441,7 @@ class PolynomialRegression(LinearRegression):
         self,
         X: np.ndarray | pd.DataFrame | list | int | float,
         y: np.ndarray | pd.DataFrame | list | int | float,
-        sample_weight: np.ndarray|pd.DataFrame|list|int|float|None=None,
+        sample_weight: np.ndarray | pd.DataFrame | list | int | float | None = None,
     ):
         """
         Fit the model.
@@ -544,10 +548,10 @@ class ExponentialRegression(LinearRegression):
 
     def __init__(
         self,
-        fit_intercept:bool=True,
-        copy_X:bool=True,
-        n_jobs:int=1,
-        positive:bool=False,
+        fit_intercept: bool = True,
+        copy_X: bool = True,
+        n_jobs: int = 1,
+        positive: bool = False,
     ):
         super().__init__(
             fit_intercept=fit_intercept,
@@ -560,7 +564,7 @@ class ExponentialRegression(LinearRegression):
         self,
         X: np.ndarray | pd.DataFrame | list | int | float,
         y: np.ndarray | pd.DataFrame | list | int | float,
-        sample_weight: np.ndarray|pd.DataFrame|list|int|float|None=None,
+        sample_weight: np.ndarray | pd.DataFrame | list | int | float | None = None,
     ):
         """
         Fit the model.
@@ -667,10 +671,10 @@ class PowerRegression(LinearRegression):
 
     def __init__(
         self,
-        fit_intercept:bool=True,
-        copy_X:bool=True,
-        n_jobs:int=1,
-        positive:bool=False,
+        fit_intercept: bool = True,
+        copy_X: bool = True,
+        n_jobs: int = 1,
+        positive: bool = False,
     ):
         super().__init__(
             fit_intercept=fit_intercept,
@@ -683,7 +687,7 @@ class PowerRegression(LinearRegression):
         self,
         X: np.ndarray | pd.DataFrame | list | int | float,
         y: np.ndarray | pd.DataFrame | list | int | float,
-        sample_weight: np.ndarray|pd.DataFrame|list|int|float|None=None,
+        sample_weight: np.ndarray | pd.DataFrame | list | int | float | None = None,
     ):
         """
         Fit the model.
@@ -709,7 +713,7 @@ class PowerRegression(LinearRegression):
             y=self._simplify(y, "Y").applymap(np.log).values.astype(float),
             sample_weight=sample_weight,
         )
-        fitted.intercept_ = np.e ** fitted.intercept_
+        fitted.intercept_ = np.e**fitted.intercept_
         return fitted
 
     def predict(
@@ -801,10 +805,10 @@ class HyperbolicRegression(LinearRegression):
 
     def __init__(
         self,
-        fit_intercept:bool=True,
-        copy_X:bool=True,
-        n_jobs:int=1,
-        positive:bool=False,
+        fit_intercept: bool = True,
+        copy_X: bool = True,
+        n_jobs: int = 1,
+        positive: bool = False,
     ):
         super().__init__(
             fit_intercept=fit_intercept,
@@ -817,7 +821,7 @@ class HyperbolicRegression(LinearRegression):
         self,
         X: np.ndarray | pd.DataFrame | list | int | float,
         y: np.ndarray | pd.DataFrame | list | int | float,
-        sample_weight: np.ndarray|pd.DataFrame|list|int|float|None=None,
+        sample_weight: np.ndarray | pd.DataFrame | list | int | float | None = None,
     ):
         """
         Fit the model.
@@ -864,6 +868,146 @@ class HyperbolicRegression(LinearRegression):
         return super().predict(self._simplify(X) ** (-1))
 
 
+class ExponentialRegression(LinearRegression):
+    """
+    Ordinary Least Squares regression model in the form:
+
+            Y = b0 + b1 * k**X1 + ... + bn * k**Xn + e
+
+    Parameters
+    ----------
+    base : float | int, default= np.e
+        the base of the exponent to be used
+
+    fit_intercept : bool, default=True
+        Whether to calculate the intercept for this model. If set to False,
+        no intercept will be used in calculations
+        (i.e. data is expected to be centered).
+
+    copy_X : bool, default=True
+        If True, X will be copied; else, it may be overwritten.
+
+    n_jobs : int, default=None
+        The number of jobs to use for the computation. This will only provide
+        speedup in case of sufficiently large problems, that is if firstly
+        n_targets > 1 and secondly X is sparse or if positive is set to True.
+        None means 1 unless in a joblib.parallel_backend context. -1 means
+        using all processors. See Glossary for more details.
+
+    positive : bool, default=False
+        When set to True, forces the coefficients to be positive.
+        This option is only supported for dense arrays.
+
+    Attributes
+    ----------
+    domain: tuple[float, float]
+        the domain of the model
+
+    codomain: tuple[float, float]
+        the codomain of the model
+
+    betas: pandas DataFrame
+        a dataframe reporting the regression coefficients for each feature
+
+    coef_: array of shape (n_features, ) or (n_targets, n_features)
+        Estimated coefficients for the linear regression problem.
+        If multiple targets are passed during the fit (y 2D), this is a
+        2D array of shape (n_targets, n_features), while if only one target
+        is passed, this is a 1D array of length n_features.
+
+    rank_: int
+        Rank of matrix X. Only available when X is dense.
+
+    singular: _array of shape (min(X, y),)
+        Singular values of X. Only available when X is dense.
+
+    intercept_: float or array of shape (n_targets,)
+        Independent term in the linear model.
+        Set to 0.0 if fit_intercept = False.
+
+    n_features_in_: int
+        Number of features seen during fit.
+
+    feature_names_in_: ndarray of shape (n_features_in_,)
+        Names of features seen during fit.
+    """
+
+    _domain = (-np.inf, np.inf)
+    _codomain = (-np.inf, np.inf)
+    _base = np.e
+
+    def __init__(
+        self,
+        base: float | int = np.e,
+        fit_intercept: bool = True,
+        copy_X: bool = True,
+        n_jobs: int = 1,
+        positive: bool = False,
+    ):
+        super().__init__(
+            fit_intercept=fit_intercept,
+            copy_X=copy_X,
+            n_jobs=n_jobs,
+            positive=positive,
+        )
+        self._base = base
+
+    @property
+    def base(self):
+        """the base of the exponents"""
+        return self._base
+
+    def fit(
+        self,
+        X: np.ndarray | pd.DataFrame | list | int | float,
+        y: np.ndarray | pd.DataFrame | list | int | float,
+        sample_weight: np.ndarray | pd.DataFrame | list | int | float | None = None,
+    ):
+        """
+        Fit the model.
+
+        Parameters
+        ----------
+        X: array-like or DataFrame of shape (n_samples, n_features)
+            Training data.
+
+        y: array-like or DataFrame of shape (n_samples,)|(n_samples, n_targets)
+            Target values. Will be cast to X’s dtype if necessary.
+
+        sample_weight: array-like of shape (n_samples,), default=None
+            Individual weights for each sample.
+
+        Returns
+        -------
+        self
+            the fitted estimator
+        """
+        return super().fit(
+            X=self.base ** self._simplify(X, "X"),
+            y=self._simplify(y, "Y").values.astype(float),
+            sample_weight=sample_weight,
+        )
+
+    def predict(
+        self,
+        X: np.ndarray | pd.DataFrame | list | int | float,
+    ):
+        """
+        Fit the model.
+
+        Parameters
+        ----------
+        X: array-like or DataFrame of shape (n_samples, n_features)
+            Training data.
+
+        Returns
+        -------
+        z: DataFrame
+            the predicted values.
+        """
+        return super().predict(self.base ** self._simplify(X))
+
+
 class EllipseRegression(LinearRegression):
     """
     fit an Ellipse to the provided data according to the model:
@@ -877,11 +1021,11 @@ class EllipseRegression(LinearRegression):
         Citeseer. https://citeseerx.ist.psu.edu/viewdoc/download;jsessionid=DF7A4B034A45C75AFCFF861DA1D7B5CD?doi=10.1.1.1.7559&rep=rep1&type=pdf
     """
 
-    _axis_major:NamedTuple
-    _axis_minor:NamedTuple
-    _names:list[str] = []
-    coef_:np.ndarray
-    intercept_:float
+    _axis_major: NamedTuple
+    _axis_minor: NamedTuple
+    _names: list[str] = []
+    coef_: np.ndarray
+    intercept_: float
 
     def __init__(
         self,
@@ -897,7 +1041,7 @@ class EllipseRegression(LinearRegression):
         self,
         X: np.ndarray | pd.DataFrame | list | int | float,
         y: np.ndarray | pd.DataFrame | list | int | float,
-        sample_weight: np.ndarray|pd.DataFrame|list|int|float|None=None,
+        sample_weight: np.ndarray | pd.DataFrame | list | int | float | None = None,
     ):
         """
         Fit the model.
@@ -991,7 +1135,7 @@ class EllipseRegression(LinearRegression):
         l1 = ((p1_1 - p1_0) ** 2).sum() ** 0.5  # type: ignore
 
         # generate the axes
-        axis = namedtuple("Axis", ['vertex', 'length', 'angle', 'coef'])
+        axis = namedtuple("Axis", ["vertex", "length", "angle", "coef"])
         ax0 = axis(vertex=p0, length=l0, angle=a0, coef=np.array([i0, m0]))
         ax1 = axis(vertex=p1, length=l1, angle=a1, coef=np.array([i1, m1]))
         if l0 > l1:
@@ -1332,9 +1476,9 @@ class CircleRegression(LinearRegression):
     https://lucidar.me/en/mathematics/least-squares-fitting-of-circle/
     """
 
-    coef_:np.ndarray
-    intercept_:float
-    _names:list[str] = []
+    coef_: np.ndarray
+    intercept_: float
+    _names: list[str] = []
 
     def __init__(
         self,
@@ -1350,7 +1494,7 @@ class CircleRegression(LinearRegression):
         self,
         X: np.ndarray | pd.DataFrame | list | int | float,
         y: np.ndarray | pd.DataFrame | list | int | float,
-        sample_weight: np.ndarray|pd.DataFrame|list|int|float|None=None,
+        sample_weight: np.ndarray | pd.DataFrame | list | int | float | None = None,
     ):
         """
         Fit the model.
