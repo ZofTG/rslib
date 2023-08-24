@@ -146,13 +146,13 @@ class LinearRegression(LReg, TransformerMixin):
         """
         representation of the object.
         """
-        return self.betas.__repr__()
+        return super().__repr__()
 
     def __str__(self):
         """
         representation of the object.
         """
-        return self.betas.__str__()
+        return super().__str__()
 
     def _simplify(
         self,
