@@ -291,10 +291,9 @@ def winter_derivative2(
         x_sig = np.copy(x_signal)
 
     # get the derivative
-    diffy = (y_signal[2:] - y_signal[1:-1]) / (x_sig[2:] - x_sig[1:-1])
-    diffy -= (y_signal[1:-1] - y_signal[:-2]) / (x_sig[1:-1] - x_sig[:-2])
-    diffx = (x_sig[2:] - x_sig[:-2]) * 0.5
-    return diffy / diffx
+    num = y_signal[2:] + y_signal[:-2] - 2 * y_signal[1:-1]
+    den = np.mean(np.diff(x_sig)) ** 2
+    return num / den
 
 
 def freedman_diaconis_bins(
