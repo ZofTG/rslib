@@ -62,16 +62,22 @@ outlyingness
 gram_schmidt
     return the orthogonal basis defined by a set of points using the
     Gram-Schmidt algorithm.
+
+fillna
+    fill missing data in numpy ndarray or pandas dataframe
+
 """
 
 
 #! IMPORTS
 
 from types import FunctionType, MethodType
-from typing import Any, Literal
+from typing import Any, Callable, Literal
 from itertools import product
+from pandas import DataFrame
 from scipy import signal  # type: ignore
 from scipy.interpolate import CubicSpline  # type: ignore
+from sklearn.impute import KNNImputer
 import numpy as np
 
 
@@ -94,6 +100,7 @@ __all__ = [
     "xcorr",
     "outlyingness",
     "gram_schmidt",
+    "fillna",
 ]
 
 
@@ -1132,7 +1139,7 @@ def xcorr(
             xcr += [np.atleast_2d(res)]
 
     # average over all the multiples
-    xcr = np.mean(np.concatenate(xcr, axis=0), axis=0)
+    xcr = np.mean(np.concatenate(xcr, axis=0), axis=0)  # type: ignore
 
     # adjust the output
     lags = np.arange(-(cols - 1), cols)
@@ -1221,3 +1228,67 @@ def gram_schmidt(
 
     # normalize
     return np.vstack([v / np.sqrt(np.sum(v**2)) for v in w_mat])
+
+
+def fillna(
+    arr: np.ndarray | DataFrame,
+    value: float | int | None = None,
+    n_neighbors: int = 5,
+    weights: Literal["uniform", "distance"] | Callable = "uniform",
+):
+    """
+    fill missing values in the array or dataframe
+
+    Parameters
+    ----------
+    arr : np.ndarray[Any, np.dtype[np.float_]] | pandas.DatFrame
+        array with nans to be filled
+
+    value : float or None
+        the value to be used for missing data replacement.
+        if None, nearest neighbours imputation from the sklearn package is
+        used.
+
+    n_neighbors : int, default=5
+        Number of neighboring samples to use for imputation.
+
+    weights: Literal[‘uniform’, ‘distance’] or callable, default=’uniform’
+        Weight function used in prediction. Possible values:
+            ‘uniform’ : uniform weights. All points in each neighborhood are
+                        weighted equally.
+            ‘distance’ : weight points by the inverse of their distance.
+                        In this case, closer neighbors of a query point will
+                        have a greater influence than neighbors which are
+                        further away.
+
+            callable : a user-defined function which accepts an array of
+                        distances, and returns an array of the same shape
+                        containing the weights.
+
+    Returns
+    -------
+    filled: np.ndarray
+        the vector without missing data.
+    """
+    # check if missing values exist
+    if not isinstance(arr, (DataFrame, np.ndarray)):
+        raise TypeError("'arr' must be a numpy.ndarray or pandas.DataFrame.")
+    filled = (arr.values if isinstance(arr, DataFrame) else arr).astype(float)
+    miss = np.isnan(arr)
+
+    # otherwise return a copy of the actual vector
+    if not np.any(miss):
+        return arr.copy() if isinstance(arr, DataFrame) else np.copy(arr)
+
+    # fill with the given value
+    if value is not None:
+        filled[np.isnan(arr)] = value
+        if isinstance(arr, np.ndarray):
+            return filled
+        out = arr.copy()
+        out.iloc[:, :] = filled
+        return out
+
+    # KNN imputation
+    imputer = KNNImputer(n_neighbors=n_neighbors, weights=weights)
+    return imputer.fit_transform(arr)

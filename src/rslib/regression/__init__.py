@@ -11,3 +11,4 @@ ols
 """
 
 from .ols import *
+from .huber import *

@@ -3,8 +3,8 @@
 #! IMPORTS
 
 
-import sys
 from os.path import dirname, join
+import sys
 
 import numpy as np
 
@@ -12,17 +12,28 @@ from .utils import add_noise
 
 sys.path += [join(dirname(dirname(dirname(__file__))), "src")]
 
-from rslib.regression import *
+from rslib.signalprocessing import *
 
-__all__ = ["test_regression"]
+
+__all__ = ["test_signalprocessing"]
 
 
 #! FUNCTION
 
 
-def test_regression():
+def test_signalprocessing():
     """test the regression module"""
-    x = np.linspace(1, 101, 101)
+
+    # fillna
+    x = np.random.randn(100, 10)
+    value = float(np.quantile(x.flatten(), 0.05))
+    x[x <= value] = value
+    y = np.copy(x)
+    y[y == value] = np.nan
+    filled_value = fillna(y, value)
+    assert np.all(x == filled_value), "fillna value not working"
+    filled_knn = fillna(y)
+    assert np.isnan(filled_knn).sum().sum() == 0, "fillna by knn not working"
 
     # linear regression
     print("\nTESTING LINEAR REGRESSION")
