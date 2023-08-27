@@ -584,12 +584,14 @@ def _read_camera_tracked(
     # convert the tracks in pandas dataframes
     idx = np.arange(list(tracks.values())[0].shape[0]) / freq + time0
     idx = pd.Index(idx, name="TIME [s]")
-    col = pd.MultiIndex.from_product([["X", "Y", "Z"], ["m"]])
-    tracks = {i: pd.DataFrame(v, idx, col) for i, v in tracks.items()}
+    kys = list(tracks.keys())
+    nms = ["LABEL", "DIMENSION", "UNIT"]
+    col = pd.MultiIndex.from_product([kys, ["X", "Y", "Z"], ["m"]], names=nms)
+    tracks = np.concatenate(list(tracks.values()), axis=1)
+    tracks = pd.DataFrame(tracks, idx, col)
 
     # update the links with the names of the tracks
-    labels = list(tracks.keys())
-    links = np.array([[labels[i] for i in j] for j in links])
+    links = np.array([[kys[i] for i in j] for j in links])
 
     return {
         "TRACKS": tracks,
@@ -956,14 +958,16 @@ def _read_platforms_tracked(
     tarr = pd.Index(tarr, name="TIME [s]")
     axs = ["X", "Y", "Z"]
     pairs = tuple(zip(["ORIGIN", "FORCE", "TORQUE"], ["m", "N", "Nm"]))
+    nms = ["LABEL", "SOURCE", "DIMENSION", "UNIT"]
+    objs = []
     for trk, arr in tracks.items():
-        objs = {}
         for idx, pair in enumerate(pairs):
             src, unt = pair
             dims = 3 * idx + np.arange(3)
-            cols = pd.MultiIndex.from_product([axs, [unt]])
-            objs[src] = pd.DataFrame(arr[:, dims], index=tarr, columns=cols)
-        out["TRACKS"][trk] = objs
+            cols = [[trk], [src], axs, [unt]]
+            cols = pd.MultiIndex.from_product(cols, names=nms)
+            objs += [pd.DataFrame(arr[:, dims], index=tarr, columns=cols)]
+    out["TRACKS"] = pd.concat(objs, axis=1)
 
     return out
 
@@ -1235,17 +1239,23 @@ def read_tdf(
             next_entry_offset = 272
 
         # read all entries
-        tdf["CAMERA_RAW"] = _read_camera_raw(fid, blocks)
-        tdf["CAMERA_TRACKED"] = _read_camera_tracked(fid, blocks)
-        tdf["CAMERA_PARAMS"] = _read_camera_params(fid, blocks)
-        tdf["CAMERA_CALIBRATION"] = _read_camera_calibration(fid, blocks)
-        tdf["CAMERA_CONFIGURATION"] = _read_camera_configuration(fid, blocks)
-        tdf["PLATFORMS_RAW"] = _read_platforms_raw(fid, blocks)
-        tdf["PLATFORMS_TRACKED"] = _read_platforms_tracked(fid, blocks)
-        tdf["PLATFORMS_PARAMETERS"] = _read_platforms_params(fid, blocks)
-        tdf["PLATFORMS_CALIBRATION"] = _read_platforms_calibration(fid, blocks)
-        tdf["DATA_GENERIC"] = _read_data_generic(fid, blocks)
-        tdf["DATA_CALIBRATION_GENERIC"] = _read_calibration_generic(fid, blocks)
+        tdf["CAMERA"] = {
+            "TRACKED": _read_camera_tracked(fid, blocks),
+            "RAW": _read_camera_raw(fid, blocks),
+            "PARAMETERS": _read_camera_params(fid, blocks),
+            "CALIBRATION": _read_camera_calibration(fid, blocks),
+            "CONFIGURATION": _read_camera_configuration(fid, blocks),
+        }
+        tdf["FORCE_PLATFORM"] = {
+            "TRACKED": _read_platforms_tracked(fid, blocks),
+            "RAW": _read_platforms_raw(fid, blocks),
+            "PARAMETERS": _read_platforms_params(fid, blocks),
+            "CALIBRATION": _read_platforms_calibration(fid, blocks),
+        }
+        tdf["GENERIC"] = {
+            "DATA": _read_data_generic(fid, blocks),
+            "CALIBRATION": _read_calibration_generic(fid, blocks),
+        }
         tdf["EMG"] = _read_emg(fid, blocks)
         tdf["EVENTS"] = _read_events(fid, blocks)
         tdf["VOLUME"] = _read_volume(fid, blocks)
