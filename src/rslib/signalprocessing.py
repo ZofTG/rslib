@@ -1273,7 +1273,6 @@ def fillna(
     # check if missing values exist
     if not isinstance(arr, (DataFrame, np.ndarray)):
         raise TypeError("'arr' must be a numpy.ndarray or pandas.DataFrame.")
-    filled = (arr.values if isinstance(arr, DataFrame) else arr).astype(float)
     miss = np.isnan(arr)
 
     # otherwise return a copy of the actual vector
@@ -1282,13 +1281,19 @@ def fillna(
 
     # fill with the given value
     if value is not None:
-        filled[np.isnan(arr)] = value
+        out = (arr.values if isinstance(arr, DataFrame) else arr).astype(float)
+        out[np.isnan(arr)] = value
         if isinstance(arr, np.ndarray):
-            return filled
-        out = arr.copy()
-        out.iloc[:, :] = filled
-        return out
+            return out
+        outf = arr.copy()
+        outf.iloc[:, :] = out
+        return outf
 
     # KNN imputation
     imputer = KNNImputer(n_neighbors=n_neighbors, weights=weights)
-    return imputer.fit_transform(arr)
+    if isinstance(arr, DataFrame):
+        outf = arr.copy()
+        outf.iloc[:, :] = imputer.fit_transform(arr)
+        return outf
+    else:
+        return imputer.fit_transform(arr)
