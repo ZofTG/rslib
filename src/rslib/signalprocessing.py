@@ -1299,10 +1299,13 @@ def fillna(
         # predict the missing values via linear regression
         xmat = splined[idx]
         for i in np.arange(splined.shape[1] - 1):
-            cols = np.delete(np.arange(splined.shape[1]), i)
-            cols = cols[np.argsort(cmat[i][cols])[::-1][:n_regressors]]
-            lrm = LinearRegression().fit(xmat[:, cols], xmat[:, i])
-            out[:, [i]] = lrm.predict(splined[:, cols])
+            rows = np.where(miss[:, i])[0]
+            if len(rows) > 0:
+                cols = np.delete(np.arange(splined.shape[1]), i)
+                cols = cols[np.argsort(cmat[i][cols])[::-1][:n_regressors]]
+                lrm = LinearRegression().fit(xmat[:, cols], xmat[:, i])
+                vec = np.atleast_2d(lrm.predict(splined[rows][:, cols])).T
+                out[rows, i] = vec
 
     # return the filled array
     if isinstance(arr, DataFrame):
