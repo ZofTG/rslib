@@ -1264,6 +1264,8 @@ def fillna(
     if not isinstance(arr, (DataFrame, np.ndarray)):
         raise TypeError("'arr' must be a numpy.ndarray or pandas.DataFrame.")
     miss = np.isnan(arr)
+    if isinstance(arr, DataFrame):
+        miss = miss.values.astype(bool)
 
     # otherwise return a copy of the actual vector
     if not np.any(miss):
