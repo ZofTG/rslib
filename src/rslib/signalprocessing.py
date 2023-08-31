@@ -72,13 +72,14 @@ fillna
 #! IMPORTS
 
 from types import FunctionType, MethodType
-from typing import Any, Callable, Literal
+from typing import Any, Literal
 from itertools import product
 from pandas import DataFrame
 from scipy import signal  # type: ignore
 from scipy.interpolate import CubicSpline  # type: ignore
-from sklearn.impute import KNNImputer
 import numpy as np
+
+from .regression import LinearRegression
 
 
 __all__ = [
@@ -1219,10 +1220,10 @@ def gram_schmidt(
 
     # calculate the projection points
     w_mat = []
-    for i, u in enumerate(points):
-        w_arr = np.copy(u).astype(np.float32)
+    for i, proj in enumerate(points):
+        w_arr = np.copy(proj).astype(np.float32)
         for j in points[:i, :]:
-            w_arr -= np.inner(u, j) / np.inner(j, j) * j
+            w_arr -= np.inner(proj, j) / np.inner(j, j) * j
         w_mat += [w_arr]
 
     # normalize
@@ -1232,15 +1233,14 @@ def gram_schmidt(
 def fillna(
     arr: np.ndarray | DataFrame,
     value: float | int | None = None,
-    n_neighbors: int = 5,
-    weights: Literal["uniform", "distance"] | Callable = "uniform",
+    n_regressors: int | None = None,
 ):
     """
-    fill missing values in the array or dataframe
+    fill missing values in the array or dataframe.
 
     Parameters
     ----------
-    arr : np.ndarray[Any, np.dtype[np.float_]] | pandas.DatFrame
+    arr : np.ndarray[Any, np.dtype[np.float_]] | pandas.DataFrame
         array with nans to be filled
 
     value : float or None
@@ -1248,21 +1248,12 @@ def fillna(
         if None, nearest neighbours imputation from the sklearn package is
         used.
 
-    n_neighbors : int, default=5
-        Number of neighboring samples to use for imputation.
-
-    weights: Literal[‘uniform’, ‘distance’] or callable, default=’uniform’
-        Weight function used in prediction. Possible values:
-            ‘uniform’ : uniform weights. All points in each neighborhood are
-                        weighted equally.
-            ‘distance’ : weight points by the inverse of their distance.
-                        In this case, closer neighbors of a query point will
-                        have a greater influence than neighbors which are
-                        further away.
-
-            callable : a user-defined function which accepts an array of
-                        distances, and returns an array of the same shape
-                        containing the weights.
+    n_regressors : int | None, default=NOne
+        Number of regressors to be used in a Multiple Linear Regression model.
+        The model used the "n_regressors" most correlated columns of
+        arr as indipendent variables to fit the missing values. The procedure
+        is repeated for each dimension separately.
+        If None, cubic spline interpolation is used on each column separately.
 
     Returns
     -------
@@ -1281,18 +1272,39 @@ def fillna(
     # fill with the given value
     if value is not None:
         out = (arr.values if isinstance(arr, DataFrame) else arr).astype(float)
-        out[np.isnan(arr)] = value
+        out[miss] = value
         if isinstance(arr, np.ndarray):
             return out
         outf = arr.copy()
         outf.iloc[:, :] = out
         return outf
 
-    # KNN imputation
-    imputer = KNNImputer(n_neighbors=n_neighbors, weights=weights)
+    # fill the missing data of each set via cubic spline
+    idx = np.where(~miss.any(axis=1))[0]
     if isinstance(arr, DataFrame):
-        outf = arr.copy()
-        outf.iloc[:, :] = imputer.fit_transform(arr)
-        return outf
+        x_new = arr.index.to_numpy()
+        y_old = arr.iloc[idx].values.astype(float)
     else:
-        return imputer.fit_transform(arr)
+        x_new = np.arange(arr.shape[0])
+        y_old = arr[idx]
+    x_old = x_new[idx]
+    splined = CubicSpline(x_old, y_old)(x_new).astype(float)
+
+    # check if linear regression models have to be used
+    out = np.copy(splined)
+    if n_regressors is not None:
+        # get the correlation matrix
+        cmat = np.corrcoef(splined.T)
+
+        # predict the missing values via linear regression
+        xmat = splined[idx]
+        for i in np.arange(splined.shape[1] - 1):
+            cols = np.delete(np.arange(splined.shape[1]), i)
+            cols = cols[np.argsort(cmat[i][cols])[::-1][:n_regressors]]
+            lrm = LinearRegression().fit(xmat[:, cols], xmat[:, i])
+            out[:, [i]] = lrm.predict(splined[:, cols])
+
+    # return the filled array
+    if isinstance(arr, DataFrame):
+        out = DataFrame(splined, index=arr.index, columns=arr.columns)
+    return out
