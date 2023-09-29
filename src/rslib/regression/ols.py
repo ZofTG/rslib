@@ -575,8 +575,8 @@ class PowerRegression(LinearRegression):
             the fitted estimator
         """
         fitted = super().fit(
-            X=self._simplify(X, "X").applymap(np.log),
-            y=self._simplify(y, "Y").applymap(np.log).values.astype(float),
+            X=self._simplify(X, "X").map(np.log),
+            y=self._simplify(y, "Y").map(np.log).values.astype(float),
             sample_weight=sample_weight,
         )
         fitted.intercept_ = np.e**fitted.intercept_
@@ -709,7 +709,7 @@ class HyperbolicRegression(LinearRegression):
             the fitted estimator
         """
         return super().fit(
-            X=self._simplify(X, "X").applymap(lambda x: x**-1),
+            X=self._simplify(X, "X").map(lambda x: x**-1),
             y=self._simplify(y, "Y").values.astype(float),
             sample_weight=sample_weight,
         )
@@ -731,7 +731,7 @@ class HyperbolicRegression(LinearRegression):
         z: DataFrame
             the predicted values.
         """
-        return super().predict(self._simplify(X, "X").applymap(lambda x: x**-1))
+        return super().predict(self._simplify(X, "X").map(lambda x: x**-1))
 
 
 class ExponentialRegression(LinearRegression):
@@ -849,7 +849,7 @@ class ExponentialRegression(LinearRegression):
             the fitted estimator
         """
         return super().fit(
-            X=self._simplify(X, "X").applymap(lambda x: self.base**x),
+            X=self._simplify(X, "X").map(lambda x: self.base**x),
             y=self._simplify(y, "Y").values.astype(float),
             sample_weight=sample_weight,
         )
@@ -871,7 +871,7 @@ class ExponentialRegression(LinearRegression):
         z: DataFrame
             the predicted values.
         """
-        XX = self._simplify(X, "X").applymap(lambda x: self.base**x)
+        XX = self._simplify(X, "X").map(lambda x: self.base**x)
         return super().predict(XX)
 
 
