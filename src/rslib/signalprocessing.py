@@ -871,8 +871,8 @@ def residual_analysis(
 
 
 def _sse(
-    xval: np.ndarray[Any, np.dtype[np.float_]],
-    yval: np.ndarray[Any, np.dtype[np.float_]],
+    xval: np.ndarray[Any, np.dtype[np.float_ | np.int_]],
+    yval: np.ndarray[Any, np.dtype[np.float_ | np.int_]],
     segm: list[tuple[int]],
 ):
     """
@@ -908,7 +908,7 @@ def _sse(
 
 
 def crossovers(
-    arr: np.ndarray[Any, np.dtype[np.float_]],
+    arr: np.ndarray[Any, np.dtype[np.float_ | np.int_]],
     segments: int = 2,
     min_samples: int = 5,
 ):
@@ -966,7 +966,7 @@ def crossovers(
     assert min_samples >= 2, "'min_samples' must be >= 2."
 
     # get the X axis
-    xaxis = np.arange(len(arr)).astype(float)
+    xaxis = np.arange(len(arr))
 
     # get all the possible combinations of segments
     combs = []
