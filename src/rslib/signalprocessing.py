@@ -901,7 +901,7 @@ def _sse(
     sse = 0.0
     for i in np.arange(len(segm) - 1):
         coords = np.arange(segm[i], segm[i + 1] + 1)
-        coefs = np.polyfit(xval[i], yval[i], 1)
+        coefs = np.polyfit(xval[coords], yval[coords], 1)
         vals = np.polyval(coefs, xval[coords])
         sse += np.sum((yval[coords] - vals) ** 2)
     return float(sse)
