@@ -544,7 +544,6 @@ class LogRegression(PolynomialRegression):
 
     _domain = (-np.inf, np.inf)
     _codomain = (-np.inf, np.inf)
-    degree: int
     base: int | float
 
     def __init__(
@@ -557,12 +556,12 @@ class LogRegression(PolynomialRegression):
         positive: bool = False,
     ):
         super().__init__(
+            degree=degree,
             fit_intercept=fit_intercept,
             copy_X=copy_X,
             n_jobs=n_jobs,
             positive=positive,
         )
-        self.degree = degree
         self.base = base
 
     def _adjust_degree(
