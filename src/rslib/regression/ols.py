@@ -55,6 +55,7 @@ __all__ = [
     "PowerRegression",
     "HyperbolicRegression",
     "ExponentialRegression",
+    "LogRegression",
     "EllipseRegression",
     "CircleRegression",
 ]
@@ -475,6 +476,114 @@ class PolynomialRegression(LinearRegression):
             the predicted values.
         """
         return super().predict(X=self._adjust_degree(X))
+
+
+class LogRegression(PolynomialRegression):
+    """
+    Ordinary Least Squares regression model in the form:
+
+            Y = b0 + b1 * X**1 + ... + bn * X**n + e
+
+    Parameters
+    ----------
+    degree: int = 1
+        the polynomial order
+
+    fit_intercept : bool, default=True
+        Whether to calculate the intercept for this model. If set to False,
+        no intercept will be used in calculations
+        (i.e. data is expected to be centered).
+
+    copy_X : bool, default=True
+        If True, X will be copied; else, it may be overwritten.
+
+    n_jobs : int, default=None
+        The number of jobs to use for the computation. This will only provide
+        speedup in case of sufficiently large problems, that is if firstly
+        n_targets > 1 and secondly X is sparse or if positive is set to True.
+        None means 1 unless in a joblib.parallel_backend context. -1 means
+        using all processors. See Glossary for more details.
+
+    positive : bool, default=False
+        When set to True, forces the coefficients to be positive.
+        This option is only supported for dense arrays.
+
+    Attributes
+    ----------
+    base: int
+        the base of the log
+
+    degree: int
+        the polynomial degree
+
+    betas: pandas DataFrame
+        a dataframe reporting the regression coefficients for each feature
+
+    coef_: array of shape (n_features, ) or (n_targets, n_features)
+        Estimated coefficients for the linear regression problem.
+        If multiple targets are passed during the fit (y 2D), this is a
+        2D array of shape (n_targets, n_features), while if only one target
+        is passed, this is a 1D array of length n_features.
+
+    rank_: int
+        Rank of matrix X. Only available when X is dense.
+
+    singular: _array of shape (min(X, y),)
+        Singular values of X. Only available when X is dense.
+
+    intercept_: float or array of shape (n_targets,)
+        Independent term in the linear model.
+        Set to 0.0 if fit_intercept = False.
+
+    n_features_in_: int
+        Number of features seen during fit.
+
+    feature_names_in_: ndarray of shape (n_features_in_,)
+        Names of features seen during fit.
+    """
+
+    _domain = (-np.inf, np.inf)
+    _codomain = (-np.inf, np.inf)
+    degree: int
+    base: int | float
+
+    def __init__(
+        self,
+        base: int | float = np.e,
+        degree: int = 1,
+        fit_intercept: bool = True,
+        copy_X: bool = True,
+        n_jobs: int = 1,
+        positive: bool = False,
+    ):
+        super().__init__(
+            fit_intercept=fit_intercept,
+            copy_X=copy_X,
+            n_jobs=n_jobs,
+            positive=positive,
+        )
+        self.degree = degree
+        self.base = base
+
+    def _adjust_degree(
+        self,
+        X: np.ndarray | pd.DataFrame | list | int | float,
+    ):
+        """
+        prepare the input to the fit and predict methods
+
+        Parameters
+        ----------
+        X : np.ndarray | pd.DataFrame | list | int | float
+           the training data
+
+        Returns
+        -------
+        XX: pd.DataFrame
+            the transformed features
+        """
+        K = pd.DataFrame(X).map(lambda x: np.log(x) / np.log(np.e))
+        return super()._adjust_degree(K)
 
 
 class PowerRegression(LinearRegression):
