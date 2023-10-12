@@ -43,6 +43,7 @@ CircleRegression
 
 from collections import namedtuple
 from typing import NamedTuple
+from sklearn.preprocessing import PolynomialFeatures
 from sklearn.linear_model import LinearRegression as LReg
 from sklearn.base import TransformerMixin
 import numpy as np
@@ -404,7 +405,7 @@ class PolynomialRegression(LinearRegression):
 
     def _adjust_degree(
         self,
-        X: np.ndarray | pd.DataFrame | list | int | float,
+        X: np.ndarray | pd.DataFrame | pd.Series | list | int | float,
     ):
         """
         prepare the input to the fit and predict methods
@@ -420,13 +421,16 @@ class PolynomialRegression(LinearRegression):
             the transformed features
         """
         XX = self._simplify(X, "X")
-        col = XX.columns
-        XXn = []
-        for i in np.arange(1, self.degree) + 1:
-            dfn = XX**i
-            dfn.columns = pd.Index([f"{j}^{i}" for j in col])
-            XXn += [dfn]
-        return pd.concat([XX] + XXn, axis=1)
+        feats = PolynomialFeatures(
+            degree=self.degree,
+            interaction_only=False,
+            include_bias=False,
+        )
+        return pd.DataFrame(
+            data=feats.fit_transform(XX),
+            columns=feats.get_feature_names_out(),
+            index=XX.index,
+        )
 
     def fit(
         self,
@@ -556,7 +560,7 @@ class LogRegression(PolynomialRegression):
         n_jobs: int = 1,
         positive: bool = False,
     ):
-        super(PolynomialRegression, self).__init__(
+        super().__init__(
             degree=degree,
             fit_intercept=fit_intercept,
             copy_X=copy_X,
@@ -567,7 +571,7 @@ class LogRegression(PolynomialRegression):
 
     def _adjust_degree(
         self,
-        X: np.ndarray | pd.DataFrame | list | int | float,
+        X: np.ndarray | pd.DataFrame | pd.Series | list | int | float,
     ):
         """
         prepare the input to the fit and predict methods
@@ -582,7 +586,14 @@ class LogRegression(PolynomialRegression):
         XX: pd.DataFrame
             the transformed features
         """
-        K = pd.DataFrame(X).map(lambda x: np.log(x) / np.log(np.e))
+        if isinstance(X, (pd.DataFrame, pd.Series)):
+            K = X.map(lambda x: np.log(x) / np.log(np.e))  # type: ignore
+        else:
+            K = np.log(X) / np.log(np.e)
+        if isinstance(X, list):
+            K = K.tolist()
+        elif isinstance(X, (int, float)):
+            K = K[0]
         return super()._adjust_degree(K)
 
 

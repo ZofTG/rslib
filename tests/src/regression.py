@@ -10,9 +10,9 @@ import numpy as np
 
 from .utils import add_noise
 
-sys.path += [join(dirname(dirname(dirname(__file__))), "src")]
+sys.path += [join(dirname(dirname(dirname(__file__))), "src", "rslib")]
 
-from rslib.regression import *
+from regression import *
 
 __all__ = ["test_regression"]
 
@@ -35,10 +35,10 @@ def test_regression():
     print(f"Input betas: {b_in}\nOutput betas: {betas}\nRMSE: {rmse:0.3f}\n")
 
     # Log regression
-    print("\nTESTING LINEAR REGRESSION")
-    b_in = [2, 0.5]
-    y = add_noise(x * b_in[1] + b_in[0], 0.1)
-    model = LogRegression(2).fit(x, y)
+    print("\nTESTING LOG REGRESSION")
+    b_in = [2, 0.5, 0.1]
+    y = add_noise(b_in[0] + np.log(x) * b_in[1] + np.log(x) ** 2 * b_in[2], 0.1)
+    model = LogRegression(degree=2).fit(x, y)
     betas = model.betas.values.flatten().tolist()
     z = model.predict(x).flatten()
     rmse = np.mean((y - z) ** 2) ** 0.5
