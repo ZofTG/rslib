@@ -546,6 +546,7 @@ class LogRegression(PolynomialRegression):
     _domain = (-np.inf, np.inf)
     _codomain = (-np.inf, np.inf)
     base: int | float
+    feature_names_in_: list[str] = []
 
     def __init__(
         self,
