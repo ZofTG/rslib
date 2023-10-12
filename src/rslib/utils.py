@@ -456,10 +456,13 @@ def split_data(
     """
 
     # get the grouped data by quantiles
-    qnts = np.quantile(data, np.linspace(0, 1, groups))
-    grps = np.digitize(data, qnts, right=True)
-    idxs = np.arange(len(data))
-    grps = [idxs[grps == i] for i in np.arange(groups)]
+    if groups <= 1:
+        grps = [np.arange(len(data))]
+    else:
+        qnts = np.quantile(data, np.linspace(0, 1, groups))
+        grps = np.digitize(data, qnts, right=True)
+        idxs = np.arange(len(data))
+        grps = [idxs[grps == i] for i in np.arange(groups)]
 
     # split each group
     dss = {i: [] for i in proportion.keys()}
