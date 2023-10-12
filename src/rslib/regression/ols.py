@@ -294,11 +294,9 @@ class LinearRegression(LReg, TransformerMixin):
             the fitted estimator
         """
         YY = self._simplify(y, "Y")
-        XX = self._simplify(X, "X")
-        self._names_in = XX.columns.tolist()
         self._names_out = YY.columns.tolist()
         return super().fit(
-            X=XX,
+            X=self._simplify(X, "X"),
             y=YY.values.astype(float),
             sample_weight=sample_weight,
         )
