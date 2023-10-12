@@ -34,6 +34,16 @@ def test_regression():
     rmse = np.mean((y - z) ** 2) ** 0.5
     print(f"Input betas: {b_in}\nOutput betas: {betas}\nRMSE: {rmse:0.3f}\n")
 
+    # Log regression
+    print("\nTESTING LINEAR REGRESSION")
+    b_in = [2, 0.5]
+    y = add_noise(x * b_in[1] + b_in[0], 0.1)
+    model = LogRegression(2).fit(x, y)
+    betas = model.betas.values.flatten().tolist()
+    z = model.predict(x).flatten()
+    rmse = np.mean((y - z) ** 2) ** 0.5
+    print(f"Input betas: {b_in}\nOutput betas: {betas}\nRMSE: {rmse:0.3f}\n")
+
     # polynomial regression
     print("\nTESTING POLYNOMIAL REGRESSION")
     b_in = [2, 0.5, 0.1]

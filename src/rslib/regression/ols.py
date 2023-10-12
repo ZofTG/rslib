@@ -128,7 +128,7 @@ class LinearRegression(LReg, TransformerMixin):
     _domain = (-np.inf, np.inf)
     _codomain = (-np.inf, np.inf)
     _names_out: list[str] = []
-    _names_in: list[str] = []
+    feature_names_in_: list[str] = []
 
     def __init__(
         self,
@@ -198,11 +198,6 @@ class LinearRegression(LReg, TransformerMixin):
     def codomain(self):
         """return the codomain of this model"""
         return self._codomain
-
-    @property
-    def feature_names_in_(self):
-        """name of the input features"""
-        return self._names_in
 
     @property
     def betas(self):
