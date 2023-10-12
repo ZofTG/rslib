@@ -127,7 +127,8 @@ class LinearRegression(LReg, TransformerMixin):
 
     _domain = (-np.inf, np.inf)
     _codomain = (-np.inf, np.inf)
-    _names: list[str] = []
+    _names_out: list[str] = []
+    _names_in: list[str] = []
 
     def __init__(
         self,
@@ -199,6 +200,11 @@ class LinearRegression(LReg, TransformerMixin):
         return self._codomain
 
     @property
+    def feature_names_in_(self):
+        """name of the input features"""
+        return self._names_in
+
+    @property
     def betas(self):
         """return the beta coefficients of the model"""
         rows = len(self.feature_names_in_) + (1 if self.fit_intercept else 0)
@@ -218,7 +224,7 @@ class LinearRegression(LReg, TransformerMixin):
         input_features=None,
     ):
         """return the names of the fitted values"""
-        return self._names
+        return self._names_out
 
     def transform(
         self,
@@ -293,9 +299,11 @@ class LinearRegression(LReg, TransformerMixin):
             the fitted estimator
         """
         YY = self._simplify(y, "Y")
-        self._names = YY.columns.tolist()
+        XX = self._simplify(X, "X")
+        self._names_in = XX.columns.tolist()
+        self._names_out = YY.columns.tolist()
         return super().fit(
-            X=self._simplify(X, "X"),
+            X=XX,
             y=YY.values.astype(float),
             sample_weight=sample_weight,
         )
