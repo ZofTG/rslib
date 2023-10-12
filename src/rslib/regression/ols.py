@@ -565,6 +565,7 @@ class LogRegression(PolynomialRegression):
             positive=positive,
         )
         self.base = base
+        self.feature_names_in_ = []
 
     def _adjust_degree(
         self,
