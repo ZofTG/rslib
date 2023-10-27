@@ -368,9 +368,12 @@ def magnitude(
             the number required to elevate the base to get the value
     """
     if value == 0 or base == 0:
-        return 0
+        return int(0)
     else:
-        return np.log(abs(value)) / np.log(base)
+        val = np.log(abs(value)) / np.log(base)
+        if val < 0:
+            return -int(np.ceil(-val))
+        return int(np.ceil(val))
 
 
 def get_files(
