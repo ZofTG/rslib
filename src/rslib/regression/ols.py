@@ -616,7 +616,7 @@ class PowerRegression(LinearRegression):
     """
     Regression model having form:
 
-                Y = b0 * X1 ** b1 * ... + Xn ** bn + e
+                Y = b0 * X1 ** b1 * ... * Xn ** bn + e
 
     Parameters
     ----------
