@@ -745,9 +745,7 @@ class PowerRegression(LinearRegression):
             the predicted values.
         """
         xvec = self._simplify(xarr, "X")
-        ovec = np.ones(xvec.shape)
-        yvec = [np.prod(xvec.values ** (ovec * trgt), axis=1) for trgt in self.coef_]
-        return self.intercept_ * np.squeeze(np.vstack(np.atleast_2d(*yvec)).T)
+        return self.intercept_ * np.prod(xvec.values**self.coef_, axis=1)
 
 
 class ExponentialRegression(LinearRegression):
