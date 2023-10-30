@@ -669,7 +669,6 @@ class PowerRegression(LinearRegression):
 
     _domain = (-np.inf, np.inf)
     _codomain = (0, np.inf)
-    _gammas = None
 
     def __init__(
         self,
