@@ -20,11 +20,6 @@ PowerRegression
             Y = b0 * X1 ** b1 * ... + Xn ** bn + e
 
 
-HyperbolicRegression
-    Regression tool fitting the model
-            Y = b0 + b1/X1 + ... + bn/Xn + e
-
-
 ExponentialRegression
     Ordinary Least Squares regression model in the form:
             Y = b0 + b1 * k**X1 + ... + bn * k**Xn + e
@@ -54,7 +49,6 @@ __all__ = [
     "LinearRegression",
     "PolynomialRegression",
     "PowerRegression",
-    "HyperbolicRegression",
     "ExponentialRegression",
     "LogRegression",
     "EllipseRegression",
@@ -148,7 +142,7 @@ class LinearRegression(LReg, TransformerMixin):
 
     def _simplify(
         self,
-        v: np.ndarray | pd.DataFrame | list | int | float,
+        vec: np.ndarray | pd.DataFrame | pd.Series | list | int | float,
         label: str = "",
     ):
         """
@@ -157,7 +151,7 @@ class LinearRegression(LReg, TransformerMixin):
 
         Parameters
         ----------
-        v: np.ndarray | pd.DataFrame | list | int | float | None
+        vec: np.ndarray | pd.DataFrame | pd.Series | list | int | float | None
             the data to be formatter
 
         label: str
@@ -166,7 +160,7 @@ class LinearRegression(LReg, TransformerMixin):
 
         Returns
         -------
-        d: pd.DataFrame
+        dfr: pd.DataFrame
             the data formatted as DataFrame.
         """
 
@@ -180,15 +174,17 @@ class LinearRegression(LReg, TransformerMixin):
             cols = [f"{l}{i}" for i in range(d.shape[1])]
             return pd.DataFrame(d.astype(float), columns=cols)
 
-        if isinstance(v, pd.DataFrame):
-            return v.astype(float)
-        if isinstance(v, list):
-            return simplify_array(np.array(v), label)
-        if isinstance(v, np.ndarray):
-            return simplify_array(v, label)
-        if np.isreal(v):
-            return simplify_array(np.array([v]), label)
-        raise NotImplementedError(v)
+        if isinstance(vec, pd.DataFrame):
+            return vec.astype(float)
+        if isinstance(vec, pd.Series):
+            return pd.DataFrame(vec).T.astype(float)
+        if isinstance(vec, list):
+            return simplify_array(np.array(vec), label)
+        if isinstance(vec, np.ndarray):
+            return simplify_array(vec, label)
+        if np.isreal(vec):
+            return simplify_array(np.array([vec]), label)
+        raise NotImplementedError(vec)
 
     @property
     def domain(self):
@@ -203,7 +199,8 @@ class LinearRegression(LReg, TransformerMixin):
     @property
     def betas(self):
         """return the beta coefficients of the model"""
-        rows = len(self.feature_names_in_) + (1 if self.fit_intercept else 0)
+        rows = len(self.feature_names_in_)
+        rows += 1 if self.fit_intercept else 0  # type: ignore
         names = self.get_feature_names_out()
         cols = len(names)
         betas = np.zeros((rows, cols))
@@ -224,7 +221,7 @@ class LinearRegression(LReg, TransformerMixin):
 
     def transform(
         self,
-        X: np.ndarray | pd.DataFrame | list | int | float,
+        xarr: np.ndarray | pd.DataFrame | pd.Series | list | int | float,
     ):
         """
         Alias of "predict".
@@ -239,13 +236,19 @@ class LinearRegression(LReg, TransformerMixin):
         z: DataFrame
             the predicted values.
         """
-        return self.predict(X)
+        return self.predict(xarr)
 
     def fit_transform(
         self,
-        X: np.ndarray | pd.DataFrame | list | int | float,
-        y: np.ndarray | pd.DataFrame | list | int | float,
-        sample_weight: np.ndarray | pd.DataFrame | list | int | float | None = None,
+        xarr: np.ndarray | pd.DataFrame | pd.Series | list | int | float,
+        yarr: np.ndarray | pd.DataFrame | pd.Series | list | int | float,
+        sample_weight: np.ndarray
+        | pd.DataFrame
+        | pd.Series
+        | list
+        | int
+        | float
+        | None = None,
         **kwargs,
     ):
         """
@@ -267,13 +270,19 @@ class LinearRegression(LReg, TransformerMixin):
         z: DataFrame
             the predicted values.
         """
-        return self.fit(X=X, y=y, sample_weight=sample_weight).predict(X)
+        return self.fit(xarr=xarr, yarr=yarr, sample_weight=sample_weight).predict(xarr)
 
     def fit(
         self,
-        X: np.ndarray | pd.DataFrame | list | int | float,
-        y: np.ndarray | pd.DataFrame | list | int | float,
-        sample_weight: np.ndarray | pd.DataFrame | list | int | float | None = None,
+        xarr: np.ndarray | pd.DataFrame | pd.Series | list | int | float,
+        yarr: np.ndarray | pd.DataFrame | pd.Series | list | int | float,
+        sample_weight: np.ndarray
+        | pd.DataFrame
+        | pd.Series
+        | list
+        | int
+        | float
+        | None = None,
     ):
         """
         Fit the model.
@@ -294,32 +303,32 @@ class LinearRegression(LReg, TransformerMixin):
         self: LinearRegression
             the fitted estimator
         """
-        YY = self._simplify(y, "Y")
-        self._names_out = YY.columns.tolist()
+        yvec = self._simplify(yarr, "Y")
+        self._names_out = yvec.columns.tolist()
         return super().fit(
-            X=self._simplify(X, "X"),
-            y=YY.values.astype(float),
+            X=self._simplify(xarr, "X"),
+            y=yvec.values.astype(float),
             sample_weight=sample_weight,
         )
 
     def predict(
         self,
-        X: np.ndarray | pd.DataFrame | list | int | float,
+        xarr: np.ndarray | pd.DataFrame | pd.Series | list | int | float,
     ):
         """
         Fit the model.
 
         Parameters
         ----------
-        X: array-like or DataFrame of shape (n_samples, n_features)
+        xarr: array-like or DataFrame of shape (n_samples, n_features)
             Training data.
 
         Returns
         -------
-        z: ArrayLike
+        yarr: ArrayLike
             the predicted values.
         """
-        return super().predict(X=self._simplify(X, "X"))
+        return super().predict(X=self._simplify(xarr, "X"))
 
 
 class PolynomialRegression(LinearRegression):
@@ -405,48 +414,54 @@ class PolynomialRegression(LinearRegression):
 
     def _adjust_degree(
         self,
-        X: np.ndarray | pd.DataFrame | pd.Series | list | int | float,
+        xarr: np.ndarray | pd.DataFrame | pd.Series | list | int | float,
     ):
         """
         prepare the input to the fit and predict methods
 
         Parameters
         ----------
-        X : np.ndarray | pd.DataFrame | list | int | float
+        xarr : np.ndarray | pd.DataFrame | pd.Series | list | int | float
            the training data
 
         Returns
         -------
-        XX: pd.DataFrame
+        yvec: pd.DataFrame | pd.Series
             the transformed features
         """
-        XX = self._simplify(X, "X")
+        xvec = self._simplify(xarr, "X")
         feats = PolynomialFeatures(
             degree=self.degree,
             interaction_only=False,
             include_bias=False,
         )
         return pd.DataFrame(
-            data=feats.fit_transform(XX),
+            data=feats.fit_transform(xvec),
             columns=feats.get_feature_names_out(),
-            index=XX.index,
+            index=xvec.index,
         )
 
     def fit(
         self,
-        X: np.ndarray | pd.DataFrame | list | int | float,
-        y: np.ndarray | pd.DataFrame | list | int | float,
-        sample_weight: np.ndarray | pd.DataFrame | list | int | float | None = None,
+        xarr: np.ndarray | pd.DataFrame | pd.Series | list | int | float,
+        yarr: np.ndarray | pd.DataFrame | pd.Series | list | int | float,
+        sample_weight: np.ndarray
+        | pd.DataFrame
+        | pd.Series
+        | list
+        | int
+        | float
+        | None = None,
     ):
         """
         Fit the model.
 
         Parameters
         ----------
-        X: array-like or DataFrame of shape (n_samples, n_features)
+        xarr: array-like or DataFrame of shape (n_samples, n_features)
             Training data.
 
-        y: array-like or DataFrame of shape (n_samples,)|(n_samples, n_targets)
+        yarr: array-like or DataFrame of shape (n_samples,)|(n_samples, n_targets)
             Target values. Will be cast to X’s dtype if necessary.
 
         sample_weight: array-like of shape (n_samples,), default=None
@@ -458,29 +473,29 @@ class PolynomialRegression(LinearRegression):
             the fitted estimator
         """
         return super().fit(
-            X=self._adjust_degree(X),
-            y=self._simplify(y, "Y").values.astype(float),
+            xarr=self._adjust_degree(xarr),
+            yarr=self._simplify(yarr, "Y").values.astype(float),
             sample_weight=sample_weight,
         )
 
     def predict(
         self,
-        X: np.ndarray | pd.DataFrame | list | int | float,
+        xarr: np.ndarray | pd.DataFrame | pd.Series | list | int | float,
     ):
         """
         Fit the model.
 
         Parameters
         ----------
-        X: array-like or DataFrame of shape (n_samples, n_features)
+        xarr: array-like or DataFrame of shape (n_samples, n_features)
             Training data.
 
         Returns
         -------
-        z: DataFrame
+        yarr: DataFrame
             the predicted values.
         """
-        return super().predict(X=self._adjust_degree(X))
+        return super().predict(xarr=self._adjust_degree(xarr))
 
 
 class LogRegression(PolynomialRegression):
@@ -571,30 +586,30 @@ class LogRegression(PolynomialRegression):
 
     def _adjust_degree(
         self,
-        X: np.ndarray | pd.DataFrame | pd.Series | list | int | float,
+        xarr: np.ndarray | pd.DataFrame | pd.Series | list | int | float,
     ):
         """
         prepare the input to the fit and predict methods
 
         Parameters
         ----------
-        X : np.ndarray | pd.DataFrame | list | int | float
+        xarr : np.ndarray | pd.DataFrame | pd.Series | list | int | float
            the training data
 
         Returns
         -------
-        XX: pd.DataFrame
+        yarr: pd.DataFrame | pd.Series
             the transformed features
         """
-        if isinstance(X, (pd.DataFrame, pd.Series)):
-            K = X.map(lambda x: np.log(x) / np.log(np.e))  # type: ignore
+        if isinstance(xarr, (pd.DataFrame, pd.Series)):
+            yarr = xarr.map(lambda x: np.log(x) / np.log(np.e))  # type: ignore
         else:
-            K = np.log(X) / np.log(np.e)
-        if isinstance(X, list):
-            K = K.tolist()
-        elif isinstance(X, (int, float)):
-            K = K[0]
-        return super()._adjust_degree(K)
+            yarr = np.log(xarr) / np.log(np.e)
+        if isinstance(xarr, list):
+            yarr = yarr.tolist()
+        elif isinstance(xarr, (int, float)):
+            yarr = yarr[0]
+        return super()._adjust_degree(yarr)
 
 
 class PowerRegression(LinearRegression):
@@ -654,6 +669,7 @@ class PowerRegression(LinearRegression):
 
     _domain = (-np.inf, np.inf)
     _codomain = (0, np.inf)
+    _gammas = None
 
     def __init__(
         self,
@@ -671,19 +687,25 @@ class PowerRegression(LinearRegression):
 
     def fit(
         self,
-        X: np.ndarray | pd.DataFrame | list | int | float,
-        y: np.ndarray | pd.DataFrame | list | int | float,
-        sample_weight: np.ndarray | pd.DataFrame | list | int | float | None = None,
+        xarr: np.ndarray | pd.DataFrame | pd.Series | list | int | float,
+        yarr: np.ndarray | pd.DataFrame | pd.Series | list | int | float,
+        sample_weight: np.ndarray
+        | pd.DataFrame
+        | pd.Series
+        | list
+        | int
+        | float
+        | None = None,
     ):
         """
         Fit the model.
 
         Parameters
         ----------
-        X: array-like or DataFrame of shape (n_samples, n_features)
+        xarr: array-like or DataFrame of shape (n_samples, n_features)
             Training data.
 
-        y: array-like or DataFrame of shape (n_samples,)|(n_samples, n_targets)
+        yarr: array-like or DataFrame of shape (n_samples,)|(n_samples, n_targets)
             Target values. Will be cast to X’s dtype if necessary.
 
         sample_weight: array-like of shape (n_samples,), default=None
@@ -694,17 +716,21 @@ class PowerRegression(LinearRegression):
         self
             the fitted estimator
         """
+        # first iteration
+        xvec = self._simplify(xarr, "X").map(np.log)  # type: ignore
+        yvec = self._simplify(yarr, "Y").map(np.log)  # type: ignore
         fitted = super().fit(
-            X=self._simplify(X, "X").map(np.log),
-            y=self._simplify(y, "Y").map(np.log).values.astype(float),
+            xarr=xvec,
+            yarr=yvec,
             sample_weight=sample_weight,
         )
         fitted.intercept_ = np.e**fitted.intercept_
+
         return fitted
 
     def predict(
         self,
-        X: np.ndarray | pd.DataFrame | list | int | float,
+        xarr: np.ndarray | pd.DataFrame | pd.Series | list | int | float,
     ):
         """
         Fit the model.
@@ -719,139 +745,10 @@ class PowerRegression(LinearRegression):
         z: DataFrame
             the predicted values.
         """
-        XX = self._simplify(X, "X")
-        OO = np.ones(XX.shape)
-        YY = [np.prod(XX.values ** (OO * trgt), axis=1) for trgt in self.coef_]
-        return self.intercept_ * np.squeeze(np.vstack(np.atleast_2d(*YY)).T)
-
-
-class HyperbolicRegression(LinearRegression):
-    """
-    Ordinary Least Squares regression model in the form:
-
-            Y = b0 + b1/X1 + ... + bn/Xn + e
-
-    Parameters
-    ----------
-    fit_intercept : bool, default=True
-        Whether to calculate the intercept for this model. If set to False,
-        no intercept will be used in calculations
-        (i.e. data is expected to be centered).
-
-    copy_X : bool, default=True
-        If True, X will be copied; else, it may be overwritten.
-
-    n_jobs : int, default=None
-        The number of jobs to use for the computation. This will only provide
-        speedup in case of sufficiently large problems, that is if firstly
-        n_targets > 1 and secondly X is sparse or if positive is set to True.
-        None means 1 unless in a joblib.parallel_backend context. -1 means
-        using all processors. See Glossary for more details.
-
-    positive : bool, default=False
-        When set to True, forces the coefficients to be positive.
-        This option is only supported for dense arrays.
-
-    Attributes
-    ----------
-    domain: tuple[float, float]
-        the domain of the model
-
-    codomain: tuple[float, float]
-        the codomain of the model
-
-    betas: pandas DataFrame
-        a dataframe reporting the regression coefficients for each feature
-
-    coef_: array of shape (n_features, ) or (n_targets, n_features)
-        Estimated coefficients for the linear regression problem.
-        If multiple targets are passed during the fit (y 2D), this is a
-        2D array of shape (n_targets, n_features), while if only one target
-        is passed, this is a 1D array of length n_features.
-
-    rank_: int
-        Rank of matrix X. Only available when X is dense.
-
-    singular: _array of shape (min(X, y),)
-        Singular values of X. Only available when X is dense.
-
-    intercept_: float or array of shape (n_targets,)
-        Independent term in the linear model.
-        Set to 0.0 if fit_intercept = False.
-
-    n_features_in_: int
-        Number of features seen during fit.
-
-    feature_names_in_: ndarray of shape (n_features_in_,)
-        Names of features seen during fit.
-    """
-
-    _domain = (-np.inf, np.inf)
-    _codomain = (-np.inf, np.inf)
-
-    def __init__(
-        self,
-        fit_intercept: bool = True,
-        copy_X: bool = True,
-        n_jobs: int = 1,
-        positive: bool = False,
-    ):
-        super().__init__(
-            fit_intercept=fit_intercept,
-            copy_X=copy_X,
-            n_jobs=n_jobs,
-            positive=positive,
-        )
-
-    def fit(
-        self,
-        X: np.ndarray | pd.DataFrame | list | int | float,
-        y: np.ndarray | pd.DataFrame | list | int | float,
-        sample_weight: np.ndarray | pd.DataFrame | list | int | float | None = None,
-    ):
-        """
-        Fit the model.
-
-        Parameters
-        ----------
-        X: array-like or DataFrame of shape (n_samples, n_features)
-            Training data.
-
-        y: array-like or DataFrame of shape (n_samples,)|(n_samples, n_targets)
-            Target values. Will be cast to X’s dtype if necessary.
-
-        sample_weight: array-like of shape (n_samples,), default=None
-            Individual weights for each sample.
-
-        Returns
-        -------
-        self
-            the fitted estimator
-        """
-        return super().fit(
-            X=self._simplify(X, "X").map(lambda x: x**-1),
-            y=self._simplify(y, "Y").values.astype(float),
-            sample_weight=sample_weight,
-        )
-
-    def predict(
-        self,
-        X: np.ndarray | pd.DataFrame | list | int | float,
-    ):
-        """
-        Fit the model.
-
-        Parameters
-        ----------
-        X: array-like or DataFrame of shape (n_samples, n_features)
-            Training data.
-
-        Returns
-        -------
-        z: DataFrame
-            the predicted values.
-        """
-        return super().predict(self._simplify(X, "X").map(lambda x: x**-1))
+        xvec = self._simplify(xarr, "X")
+        ovec = np.ones(xvec.shape)
+        yvec = [np.prod(xvec.values ** (ovec * trgt), axis=1) for trgt in self.coef_]
+        return self.intercept_ * np.squeeze(np.vstack(np.atleast_2d(*yvec)).T)
 
 
 class ExponentialRegression(LinearRegression):
@@ -945,9 +842,15 @@ class ExponentialRegression(LinearRegression):
 
     def fit(
         self,
-        X: np.ndarray | pd.DataFrame | list | int | float,
-        y: np.ndarray | pd.DataFrame | list | int | float,
-        sample_weight: np.ndarray | pd.DataFrame | list | int | float | None = None,
+        xarr: np.ndarray | pd.DataFrame | pd.Series | list | int | float,
+        yarr: np.ndarray | pd.DataFrame | pd.Series | list | int | float,
+        sample_weight: np.ndarray
+        | pd.DataFrame
+        | pd.Series
+        | list
+        | int
+        | float
+        | None = None,
     ):
         """
         Fit the model.
@@ -969,14 +872,14 @@ class ExponentialRegression(LinearRegression):
             the fitted estimator
         """
         return super().fit(
-            X=self._simplify(X, "X").map(lambda x: self.base**x),
-            y=self._simplify(y, "Y").values.astype(float),
+            xarr=self._simplify(xarr, "X").map(lambda x: self.base**x),  # type: ignore
+            yarr=self._simplify(yarr, "Y").values.astype(float),
             sample_weight=sample_weight,
         )
 
     def predict(
         self,
-        X: np.ndarray | pd.DataFrame | list | int | float,
+        xarr: np.ndarray | pd.DataFrame | pd.Series | list | int | float,
     ):
         """
         Fit the model.
@@ -991,8 +894,8 @@ class ExponentialRegression(LinearRegression):
         z: DataFrame
             the predicted values.
         """
-        XX = self._simplify(X, "X").map(lambda x: self.base**x)
-        return super().predict(XX)
+        xvec = self._simplify(xarr, "X").map(lambda x: self.base**x)  # type: ignore
+        return super().predict(xvec)
 
 
 class EllipseRegression(LinearRegression):
@@ -1026,9 +929,15 @@ class EllipseRegression(LinearRegression):
 
     def fit(
         self,
-        X: np.ndarray | pd.DataFrame | list | int | float,
-        y: np.ndarray | pd.DataFrame | list | int | float,
-        sample_weight: np.ndarray | pd.DataFrame | list | int | float | None = None,
+        xarr: np.ndarray | pd.DataFrame | pd.Series | list | int | float,
+        yarr: np.ndarray | pd.DataFrame | pd.Series | list | int | float,
+        sample_weight: np.ndarray
+        | pd.DataFrame
+        | pd.Series
+        | list
+        | int
+        | float
+        | None = None,
     ):
         """
         Fit the model.
@@ -1049,14 +958,14 @@ class EllipseRegression(LinearRegression):
         self
             the fitted estimator
         """
-        YY = self._simplify(y, "Y")
-        XX = self._simplify(X, "X")
-        if YY.shape[1] != 1 or XX.shape[1] != 1:
+        yvec = self._simplify(yarr, "Y")
+        xvec = self._simplify(xarr, "X")
+        if yvec.shape[1] != 1 or xvec.shape[1] != 1:
             raise ValueError("'x' and 'y' must be 1D arrays.")
 
         # quadratic part of the design matrix
-        xval = XX.values.flatten()
-        yval = YY.values.flatten()
+        xval = xvec.values.flatten()
+        yval = yvec.values.flatten()
         d_1 = np.vstack([xval**2, xval * yval, yval**2]).T
 
         # linear part of the design matrix
@@ -1108,9 +1017,9 @@ class EllipseRegression(LinearRegression):
         i1 = y0 - x0 * m1
 
         # get the crossings between the two axes and the Ellipse
-        p0_0, p0_1 = self._get_crossings(m=m0, i=i0)
+        p0_0, p0_1 = self._get_crossings(slope=m0, intercept=i0)
         p0 = np.vstack(np.atleast_2d(p0_0, p0_1))  # type: ignore
-        p1_0, p1_1 = self._get_crossings(m=m1, i=i1)
+        p1_0, p1_1 = self._get_crossings(slope=m1, intercept=i1)
         p1 = np.vstack(np.atleast_2d(p1_0, p1_1))  # type: ignore
 
         # get the angle of the two axes
@@ -1135,18 +1044,18 @@ class EllipseRegression(LinearRegression):
 
     def predict(
         self,
-        X: np.ndarray | pd.DataFrame | list | int | float | None = None,
-        y: np.ndarray | pd.DataFrame | list | int | float | None = None,
+        xarr: np.ndarray | pd.DataFrame | pd.Series | list | int | float | None = None,
+        yarr: np.ndarray | pd.DataFrame | pd.Series | list | int | float | None = None,
     ):
         """
         Fit the model.
 
         Parameters
         ----------
-        X: np.ndarray | pd.DataFrame | list | int | float | None = None
+        X: np.ndarray | pd.DataFrame | pd.Series | list | int | float | None = None
             x axis data
 
-        y: np.ndarray | pd.DataFrame | list | int | float | None = None,
+        y: np.ndarray | pd.DataFrame | pd.Series | list | int | float | None = None,
             y axis adata
 
         Returns
@@ -1154,14 +1063,14 @@ class EllipseRegression(LinearRegression):
         z: ArrayLike
             the predicted values.
         """
-        if X is None and y is None:
+        if xarr is None and yarr is None:
             return None
-        if X is not None:
-            v = self._simplify(X, "X")
+        if xarr is not None:
+            v = self._simplify(xarr, "X")
             o = np.atleast_2d([self._get_roots(x=i) for i in v.values])
             self._names = ["Y0", "Y1"]
-        elif y is not None:
-            v = self._simplify(y, "Y")
+        elif yarr is not None:
+            v = self._simplify(yarr, "Y")
             o = np.atleast_2d([self._get_roots(y=i) for i in v.values])
             self._names = ["X0", "X1"]
         else:
@@ -1171,18 +1080,18 @@ class EllipseRegression(LinearRegression):
 
     def _get_crossings(
         self,
-        m: int | float,
-        i: int | float,
+        slope: int | float,
+        intercept: int | float,
     ):
         """
         get the crossings between the provided line and the Ellipse
 
         Parameters
         ----------
-        m: float
+        slope: float
             the slope of the axis line
 
-        i: float
+        intercept: float
             the intercept of the axis line
 
         Returns
@@ -1192,9 +1101,9 @@ class EllipseRegression(LinearRegression):
             the line does not touch the Ellipse.
         """
         a, b, c, d, e, f = self.betas.values.flatten()
-        a_ = a + b * m + c * m**2
-        b_ = b * i + 2 * m * i * c + d + e * m
-        c_ = c * i**2 + e * i + f
+        a_ = a + b * slope + c * slope**2
+        b_ = b * intercept + 2 * slope * intercept * c + d + e * slope
+        c_ = c * intercept**2 + e * intercept + f
         d_ = b_**2 - 4 * a_ * c_
         if d_ < 0:
             return (None, None), (None, None)
@@ -1205,7 +1114,10 @@ class EllipseRegression(LinearRegression):
         g_ = (d_**0.5) / e_
         x0 = f_ - g_
         x1 = f_ + g_
-        return np.array([x0, x0 * m + i]), np.array([x1, x1 * m + i])
+        return (
+            np.array([x0, x0 * slope + intercept]),
+            np.array([x1, x1 * slope + intercept]),
+        )
 
     def _solve(
         self,
@@ -1295,11 +1207,11 @@ class EllipseRegression(LinearRegression):
         i: bool
             True if the provided point is contained by the Ellipse.
         """
-        out = self.predict(X=x)
+        out = self.predict(xarr=x)
         if out is None:
             return False
-        if isinstance(out, pd.DataFrame):
-            out = out.values.flatten()
+        if isinstance(out, (pd.DataFrame, pd.Series)):
+            out = out.values.astype(float).flatten()
         y0, y1 = out
         return bool((y0 is not None) & (y > min(y0, y1)) & (y <= max(y0, y1)))
 
@@ -1479,19 +1391,25 @@ class CircleRegression(LinearRegression):
 
     def fit(
         self,
-        X: np.ndarray | pd.DataFrame | list | int | float,
-        y: np.ndarray | pd.DataFrame | list | int | float,
-        sample_weight: np.ndarray | pd.DataFrame | list | int | float | None = None,
+        xarr: np.ndarray | pd.DataFrame | pd.Series | list | int | float,
+        yarr: np.ndarray | pd.DataFrame | pd.Series | list | int | float,
+        sample_weight: np.ndarray
+        | pd.DataFrame
+        | pd.Series
+        | list
+        | int
+        | float
+        | None = None,
     ):
         """
         Fit the model.
 
         Parameters
         ----------
-        X: 1D array-like
+        xarr: 1D array-like
             x-axis data.
 
-        y: 1D array-like.
+        yarr: 1D array-like.
             y-axis data.
 
         sample_weight: array-like of shape (n_samples,), default=None
@@ -1502,15 +1420,15 @@ class CircleRegression(LinearRegression):
         self
             the fitted estimator
         """
-        YY = self._simplify(y, "Y")
-        XX = self._simplify(X, "X")
-        if YY.shape[1] != 1 or XX.shape[1] != 1:
+        yvec = self._simplify(yarr, "Y")
+        xvec = self._simplify(xarr, "X")
+        if yvec.shape[1] != 1 or xvec.shape[1] != 1:
             raise ValueError("'x' and 'y' must be 1D arrays.")
-        x = XX.values.flatten()
-        y = YY.values.flatten()
-        i = np.tile(1, len(y))
-        a = np.vstack(np.atleast_2d(x, y, i)).T
-        b = np.atleast_2d(x**2 + y**2).T
+        x = xvec.values.flatten()
+        yarr = yvec.values.flatten()
+        i = np.tile(1, len(yarr))
+        a = np.vstack(np.atleast_2d(x, yarr, i)).T
+        b = np.atleast_2d(x**2 + yarr**2).T
         pinv = np.linalg.pinv
         coefs = pinv(a.T @ a) @ a.T @ b
         self.coef_ = coefs[:-1]
@@ -1519,33 +1437,33 @@ class CircleRegression(LinearRegression):
 
     def predict(
         self,
-        X: np.ndarray | pd.DataFrame | list | int | float | None = None,
-        y: np.ndarray | pd.DataFrame | list | int | float | None = None,
+        xarr: np.ndarray | pd.DataFrame | pd.Series | list | int | float | None = None,
+        yarr: np.ndarray | pd.DataFrame | pd.Series | list | int | float | None = None,
     ):
         """
         Fit the model.
 
         Parameters
         ----------
-        X: np.ndarray | pd.DataFrame | list | int | float | None = None
+        xarr: np.ndarray | pd.DataFrame | pd.Series | list | int | float | None = None
             x axis data
 
-        y: np.ndarray | pd.DataFrame | list | int | float | None = None,
+        yarr: np.ndarray | pd.DataFrame | pd.Series | list | int | float | None = None,
             y axis adata
 
         Returns
         -------
-        z: ArrayLike
+        zarr: ArrayLike
             the predicted values.
         """
-        if X is None and y is None:
+        if xarr is None and yarr is None:
             return None
-        if X is not None:
-            v = self._simplify(X, "X")
+        if xarr is not None:
+            v = self._simplify(xarr, "X")
             o = np.atleast_2d([self._get_roots(x=i) for i in v.values])
             self._names = ["Y0", "Y1"]
-        elif y is not None:
-            v = self._simplify(y, "Y")
+        elif yarr is not None:
+            v = self._simplify(yarr, "Y")
             o = np.atleast_2d([self._get_roots(y=i) for i in v.values])
             self._names = ["X0", "X1"]
         else:
@@ -1614,10 +1532,10 @@ class CircleRegression(LinearRegression):
         i: bool
             True if the provided point is contained by the ellipse.
         """
-        out = self.predict(X=x)
+        out = self.predict(xarr=x)
         if out is None:
             return False
-        if isinstance(out, pd.DataFrame):
+        if isinstance(out, pd.DataFrame | pd.Series):
             out = out.values.astype(float)
         y0, y1 = out
         return bool((y0 is not None) & (y > min(y0, y1)) & (y <= max(y0, y1)))
