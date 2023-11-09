@@ -43,6 +43,7 @@ from sklearn.linear_model import LinearRegression as LReg
 from sklearn.base import TransformerMixin
 import numpy as np
 import pandas as pd
+import copy
 
 
 __all__ = [
@@ -330,6 +331,10 @@ class LinearRegression(LReg, TransformerMixin):
         """
         return super().predict(X=self._simplify(xarr, "X"))
 
+    def copy(self):
+        """create a copy of the current object."""
+        return copy.deepcopy(self)
+
 
 class PolynomialRegression(LinearRegression):
     """
@@ -497,6 +502,10 @@ class PolynomialRegression(LinearRegression):
         """
         return super().predict(xarr=self._adjust_degree(xarr))
 
+    def copy(self):
+        """create a copy of the current object."""
+        return copy.deepcopy(self)
+
 
 class LogRegression(PolynomialRegression):
     """
@@ -610,6 +619,10 @@ class LogRegression(PolynomialRegression):
         elif isinstance(xarr, (int, float)):
             yarr = yarr[0]
         return super()._adjust_degree(yarr)
+
+    def copy(self):
+        """create a copy of the current object."""
+        return copy.deepcopy(self)
 
 
 class PowerRegression(LinearRegression):
@@ -746,6 +759,10 @@ class PowerRegression(LinearRegression):
         """
         xvec = self._simplify(xarr, "X")
         return self.intercept_ * np.prod(xvec.values**self.coef_, axis=1)
+
+    def copy(self):
+        """create a copy of the current object."""
+        return copy.deepcopy(self)
 
 
 class ExponentialRegression(LinearRegression):
@@ -893,6 +910,10 @@ class ExponentialRegression(LinearRegression):
         """
         xvec = self._simplify(xarr, "X").map(lambda x: self.base**x)  # type: ignore
         return super().predict(xvec)
+
+    def copy(self):
+        """create a copy of the current object."""
+        return copy.deepcopy(self)
 
 
 class EllipseRegression(LinearRegression):
@@ -1362,6 +1383,10 @@ class EllipseRegression(LinearRegression):
         y0, y1 = np.sort(self._solve(a, b, c))
         return float(y0), float(y1)
 
+    def copy(self):
+        """create a copy of the current object."""
+        return copy.deepcopy(self)
+
 
 class CircleRegression(LinearRegression):
     """
@@ -1614,3 +1639,7 @@ class CircleRegression(LinearRegression):
         y = self.center[1]
         r = self.radius
         return float(y - r), float(y + r)
+
+    def copy(self):
+        """create a copy of the current object."""
+        return copy.deepcopy(self)
