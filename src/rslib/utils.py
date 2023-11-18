@@ -459,22 +459,27 @@ def split_data(
     """
 
     # get the grouped data by quantiles
+    nsamp = len(data)
     if groups <= 1:
-        grps = [np.arange(len(data))]
+        grps = [np.arange(nsamp)]
     else:
-        qnts = np.quantile(data, np.linspace(0, 1, groups))
+        qnts = np.quantile(data, np.linspace(0, 1, groups + 1)[1:])
         grps = np.digitize(data, qnts, right=True)
-        idxs = np.arange(len(data))
+        idxs = np.arange(nsamp)
         grps = [idxs[grps == i] for i in np.arange(groups)]
 
     # split each group
     dss = {i: [] for i in proportion.keys()}
-    bins = np.cumsum(list(proportion.values()))
     for grp in grps:
-        props = np.linspace(0, 1, len(grp))
-        samples = np.digitize(props, bins, right=True)
         arr = np.random.permutation(grp)
-        for i, key in enumerate(list(proportion.keys())):
-            dss[key] += [arr[samples == i]]
+        nsamp = len(arr)
+        for i, k in enumerate(list(dss.keys())):
+            if i < len(proportion) - 1:
+                n = int(np.round(nsamp * proportion[k]))
+            else:
+                n = len(arr)
+            dss[k] += [arr[:n]]
+            arr = arr[n:]
 
+    # aggregate
     return {i: np.concatenate(v) for i, v in dss.items()}

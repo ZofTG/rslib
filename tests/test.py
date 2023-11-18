@@ -16,6 +16,7 @@ from tests import *
 
 def test_all():
     """test all rslib functionalities"""
+    test_utils()
     test_regression()
     test_io()
     test_signalprocessing()

@@ -5,19 +5,40 @@
 
 import sys
 from os.path import dirname, join
-
+from typing import Any
 import numpy as np
-
-from .utils import add_noise
 
 sys.path += [join(dirname(dirname(dirname(__file__))), "src", "rslib")]
 
-from regression import *
+from rslib import *
 
 __all__ = ["test_regression"]
 
 
 #! FUNCTION
+
+
+def add_noise(
+    arr: np.ndarray[Any, np.dtype[np.float_ | np.int_]],
+    noise: float,
+):
+    """
+    add noise to the array
+
+    Parameters
+    ----------
+    arr: np.ndarray[Any, np.dtype[np.float_ | np.int_]]
+        the input array
+
+    noise: float
+        the noise level
+
+    Return
+    ------
+    out: np.ndarray[Any, np.dtype[np.float_ | np.int_]]
+        the array with added input.
+    """
+    return arr + np.random.randn(*arr.shape) * np.std(arr) * noise
 
 
 def test_regression():
@@ -59,16 +80,6 @@ def test_regression():
     b_in = [2, -0.5]
     y = abs(add_noise(b_in[0] * x ** b_in[1], 0.1))
     model = PowerRegression().fit(x, y)
-    betas = model.betas.values.flatten().tolist()
-    z = model.predict(x).flatten()
-    rmse = np.mean((y - z) ** 2) ** 0.5
-    print(f"Input betas: {b_in}\nOutput betas: {betas}\nRMSE: {rmse:0.3f}\n")
-
-    # hyperbolic regression
-    print("\nTESTING HYPERBOLIC REGRESSION")
-    b_in = [2, -0.5]
-    y = abs(add_noise(b_in[0] + b_in[1] / x, 0.1))
-    model = HyperbolicRegression().fit(x, y)
     betas = model.betas.values.flatten().tolist()
     z = model.predict(x).flatten()
     rmse = np.mean((y - z) ** 2) ** 0.5

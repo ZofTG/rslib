@@ -8,8 +8,6 @@ import sys
 
 import numpy as np
 
-from .utils import add_noise
-
 sys.path += [join(dirname(dirname(dirname(__file__))), "src")]
 
 from rslib.signalprocessing import *

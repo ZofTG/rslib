@@ -3,32 +3,30 @@
 
 #! IMPORTS
 
-from numpy import random, ndarray, std
 
-__all__ = ["add_noise"]
+from os.path import dirname, join
+import sys
+
+import numpy as np
+
+sys.path += [join(dirname(dirname(dirname(__file__))), "src")]
+
+from rslib.utils import *
 
 
-#! FUNCTIONS
+__all__ = ["test_utils"]
 
 
-def add_noise(
-    arr: ndarray,
-    amp: float | int = 0.2,
-):
-    """
-    add_noise with the given amplitude to arr
+#! FUNCTION
 
-    Parameters
-    ----------
-    arr : np.ndarray
-        the input array
 
-    amp : float | int, optional
-        the noise amplitude, by default 0.2
+def test_utils():
+    """test the regression module"""
+    raw = np.arange(51)
+    splitted = split_data(raw, {"A": 0.5, "B": 0.25, "C": 0.25}, 5)
+    print(f"RAW: {raw}")
+    print(f"SPLITTED: {splitted}")
 
-    Returns
-    -------
-    arn : np.ndarray
-        the input array with added noise
-    """
-    return arr + random.randn(len(arr)) * amp * std(arr)
+
+if __name__ == "__main__":
+    test_utils()
