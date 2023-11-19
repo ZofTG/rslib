@@ -200,8 +200,7 @@ class LinearRegression(LReg, TransformerMixin):
     @property
     def betas(self):
         """return the beta coefficients of the model"""
-        rows = len(self.feature_names_in_)
-        rows += 1 if self.fit_intercept else 0  # type: ignore
+        rows = len(self.feature_names_in_) + 1
         names = self.get_feature_names_out()
         cols = len(names)
         betas = np.zeros((rows, cols))
