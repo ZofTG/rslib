@@ -443,11 +443,11 @@ def padwin(
         a 2D mask where each row denotes the indices of one window.
     """
     # get the window range
-    stop = order - int(np.floor(order * offset))
-    init = order - stop
+    stop = order - int(np.floor(order * offset)) - 1
+    init = order - stop - 1
 
     # get the indices of the samples
-    idx = np.arange(len(arr))
+    idx = np.arange(len(arr)) + init
 
     # padding
     pad = np.pad(arr, [init, stop], mode=pad_style)  # type: ignore
@@ -539,11 +539,11 @@ def mean_filt(
     """
 
     # get the window range
-    stop = order - int(np.floor(order * offset))
-    init = order - stop
+    stop = order - int(np.floor(order * offset)) - 1
+    init = order - stop - 1
 
     # get the indices of the samples
-    idx = np.arange(len(arr))
+    idx = np.arange(len(arr)) + init
 
     # padding
     pad = np.pad(arr, [init, stop], mode=pad_style)  # type: ignore
@@ -717,11 +717,11 @@ def rms_filt(
     """
 
     # get the window range
-    stop = order - int(np.floor(order * offset))
-    init = order - stop
+    stop = order - int(np.floor(order * offset)) - 1
+    init = order - stop - 1
 
     # get the indices of the samples
-    idx = np.arange(len(arr))
+    idx = np.arange(len(arr)) + init
 
     # padding
     pad = np.pad(arr, [init, stop], mode=pad_style)  # type: ignore
