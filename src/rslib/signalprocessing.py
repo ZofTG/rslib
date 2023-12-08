@@ -32,6 +32,9 @@ mean_filt
 median_filt
     apply a median filter to a 1D signal
 
+rms_filt
+    apply a rms filter to a 1D signal
+
 butterworth_filt
     apply a butterworth filter to a 1D signal
 
@@ -66,6 +69,12 @@ gram_schmidt
 fillna
     fill missing data in numpy ndarray or pandas dataframe
 
+tkeo
+    obtain the discrete Teager-Keiser Energy of the input signal.
+
+padwin
+    pad the signal according to the given order and return the mask of
+    indices defining each window on the signal.
 """
 
 
@@ -90,8 +99,10 @@ __all__ = [
     "winter_derivative2",
     "freedman_diaconis_bins",
     "fir_filt",
+    "padwin",
     "mean_filt",
     "median_filt",
+    "rms_filt",
     "butterworth_filt",
     "cubicspline_interp",
     "residual_analysis",
@@ -102,6 +113,7 @@ __all__ = [
     "outlyingness",
     "gram_schmidt",
     "fillna",
+    "tkeo",
 ]
 
 
@@ -348,8 +360,107 @@ def freedman_diaconis_bins(
     return digitized
 
 
-def mean_filt(
+def padwin(
+    arr: np.ndarray[Literal[1], np.dtype[np.float_ | np.int_]],
+    order: int = 1,
+    pad_style: str = "edge",
+    offset: float = 0.5,
+):
+    """
+    pad the signal according to the given order and return the mask of
+    indices defining each window on the signal.
+
+    Parameters
+    ----------
     arr: np.ndarray[Any, np.dtype[np.float_]],
+        the signal to be filtered.
+
+    order: int = 1,
+        the number of samples to be considered as averaging window.
+
+    pd: str = "edge"
+        the type of padding style adopted to apply before implementing
+        the filter. Available options are:
+
+        constant (default)
+        Pads with a constant value.
+
+        edge
+        Pads with the edge values of array.
+
+        linear_ramp
+        Pads with the linear ramp between end_value and the array
+        edge value.
+
+        maximum
+        Pads with the maximum value of all or part of the vector
+        along each axis.
+
+        mean
+        Pads with the mean value of all or part of the vector
+        along each axis.
+
+        median
+        Pads with the median value of all or part of the vector
+        along each axis.
+
+        minimum
+        Pads with the minimum value of all or part of the vector
+        along each axis.
+
+        reflect
+        Pads with the reflection of the vector mirrored on the first
+        and last values of the vector along each axis.
+
+        symmetric
+        Pads with the reflection of the vector mirrored along the edge
+        of the array.
+
+        wrap
+        Pads with the wrap of the vector along the axis. The first values
+        are used to pad the end and the end values are used to pad
+        the beginning.
+
+    offset: float
+        a value within the [0, 1] range defining how the averaging window is
+        obtained.
+        Offset=0,
+            indicate that for each sample, the filtered value will be the mean
+            of the subsequent n-1 values plus the current sample.
+        Offset=1,
+            on the other hand, calculates the filtered value at each sample as
+            the mean of the n-1 preceding values plus the current sample.
+        Offset=0.5,
+            centers the averaging window around the actual sample being
+            evaluated.
+
+    Returns
+    -------
+    pad: np.ndarray[Literal[1], np.dtype[np.float_ | np.int_]],
+        The padded signal
+
+    mask: np.ndarray[Literal[2], np.dtype[np.int_]],
+        a 2D mask where each row denotes the indices of one window.
+    """
+    # get the window range
+    stop = order - int(np.floor(order * offset))
+    init = order - stop
+
+    # get the indices of the samples
+    idx = np.arange(len(arr))
+
+    # padding
+    pad = np.pad(arr, [init, stop], mode=pad_style)  # type: ignore
+
+    # get the windows mask
+    rng = np.arange(-init, stop + 1)
+    mask = np.atleast_2d([rng + i for i in idx])
+
+    return pad, mask
+
+
+def mean_filt(
+    arr: np.ndarray[Literal[1], np.dtype[np.float_ | np.int_]],
     order: int = 1,
     pad_style: str = "edge",
     offset: float = 0.5,
@@ -428,30 +539,115 @@ def mean_filt(
     """
 
     # get the window range
-    win = np.unique((np.arange(order) - offset * (order - 1)).astype(int))
+    stop = order - int(np.floor(order * offset))
+    init = order - stop
 
     # get the indices of the samples
-    idx = [win + order - 1 + j for j in np.arange(len(arr))]
+    idx = np.arange(len(arr))
 
     # padding
-    filtered = np.pad(arr, order - 1, mode=pad_style)  # type: ignore
+    pad = np.pad(arr, [init, stop], mode=pad_style)  # type: ignore
 
-    # get the mean of each window
-    return np.array([np.mean(filtered[j]) for j in idx]).flatten().astype(float)
+    # get the cumulative sum of the signal
+    csum = np.cumsum(pad).astype(float)
+
+    # get the mean
+    return (csum[idx + stop] - csum[idx - init]) / order
 
 
 def median_filt(
-    arr: np.ndarray[Any, np.dtype[np.float_]],
+    arr: np.ndarray[Literal[1], np.dtype[np.float_ | np.int_]],
     order: int = 1,
     pad_style: str = "edge",
     offset: float = 0.5,
 ):
     """
-    apply a moving average filter to the signal.
+    apply a median filter to the signal.
 
     Parameters
     ----------
+    arr: np.ndarray[Any, np.dtype[np.float_]],
+        the signal to be filtered.
 
+    order: int = 1,
+        the number of samples to be considered as averaging window.
+
+    pd: str = "edge"
+        the type of padding style adopted to apply before implementing
+        the filter. Available options are:
+
+        constant (default)
+        Pads with a constant value.
+
+        edge
+        Pads with the edge values of array.
+
+        linear_ramp
+        Pads with the linear ramp between end_value and the array
+        edge value.
+
+        maximum
+        Pads with the maximum value of all or part of the vector
+        along each axis.
+
+        mean
+        Pads with the mean value of all or part of the vector
+        along each axis.
+
+        median
+        Pads with the median value of all or part of the vector
+        along each axis.
+
+        minimum
+        Pads with the minimum value of all or part of the vector
+        along each axis.
+
+        reflect
+        Pads with the reflection of the vector mirrored on the first
+        and last values of the vector along each axis.
+
+        symmetric
+        Pads with the reflection of the vector mirrored along the edge
+        of the array.
+
+        wrap
+        Pads with the wrap of the vector along the axis. The first values
+        are used to pad the end and the end values are used to pad
+        the beginning.
+
+    offset: float
+        a value within the [0, 1] range defining how the averaging window is
+        obtained.
+        Offset=0,
+            indicate that for each sample, the filtered value will be the mean
+            of the subsequent n-1 values plus the current sample.
+        Offset=1,
+            on the other hand, calculates the filtered value at each sample as
+            the mean of the n-1 preceding values plus the current sample.
+        Offset=0.5,
+            centers the averaging window around the actual sample being
+            evaluated.
+
+    Returns
+    -------
+    z: 1D array
+        The filtered signal.
+    """
+    pad, mask = padwin(arr, order, pad_style, offset)
+    return np.array([np.median(pad[i]) for i in mask])
+
+
+def rms_filt(
+    arr: np.ndarray[Literal[1], np.dtype[np.float_ | np.int_]],
+    order: int = 1,
+    pad_style: str = "edge",
+    offset: float = 0.5,
+):
+    """
+    obtain the root-mean square of the signal with the given sampling window
+
+    Parameters
+    ----------
     arr: np.ndarray[Any, np.dtype[np.float_]],
         the signal to be filtered.
 
@@ -521,17 +717,23 @@ def median_filt(
     """
 
     # get the window range
-    win = np.unique((np.arange(order) - offset * (order - 1)).astype(int))
+    stop = order - int(np.floor(order * offset))
+    init = order - stop
 
     # get the indices of the samples
-    idx = [win + order - 1 + j for j in np.arange(len(arr))]
+    idx = np.arange(len(arr))
 
     # padding
-    filtered = np.pad(arr, order - 1, mode=pad_style)  # type: ignore
+    pad = np.pad(arr, [init, stop], mode=pad_style)  # type: ignore
 
-    # get the mean of each window
-    out = [np.median(filtered[j]) for j in idx]
-    out = np.array(out).flatten().astype(float)
+    # get the squares of the signal
+    sqe = pad**2
+
+    # get the cumulative sum of the signal
+    csum = np.cumsum(sqe).astype(float)
+
+    # get the root mean of the squares
+    return ((csum[idx + stop] - csum[idx - init]) / order) ** 0.5
 
 
 def fir_filt(
@@ -1313,3 +1515,23 @@ def fillna(
     if isinstance(arr, DataFrame):
         out = DataFrame(splined, index=arr.index, columns=arr.columns)
     return out
+
+
+def tkeo(
+    arr: np.ndarray[Literal[1], np.dtype[np.float_ | np.int_]],
+):
+    """
+    obtain the discrete Teager-Keiser Energy of the input signal.
+
+    Parameters
+    ----------
+    arr : np.ndarray[Literal[1], np.dtype[np.float_  |  np.int_]]
+        a 1D input signal
+
+    Returns
+    -------
+    tke: np.ndarray[Literal[1], np.dtype[np.float_]]
+        the Teager-Keiser energy
+    """
+    out = arr[1:-1] ** 2 - arr[2:] * arr[:-2]
+    return np.concatenate([[out[0]], out, [out[-1]]]).astype(float)

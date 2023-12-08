@@ -270,7 +270,11 @@ class LinearRegression(LReg, TransformerMixin):
         z: DataFrame
             the predicted values.
         """
-        return self.fit(xarr=xarr, yarr=yarr, sample_weight=sample_weight).predict(xarr)
+        return self.fit(
+            xarr=xarr,
+            yarr=yarr,
+            sample_weight=sample_weight,
+        ).predict(xarr)
 
     def fit(
         self,
@@ -328,7 +332,11 @@ class LinearRegression(LReg, TransformerMixin):
         yarr: ArrayLike
             the predicted values.
         """
-        return super().predict(X=self._simplify(xarr, "X"))
+        out = super().predict(X=self._simplify(xarr, "X"))
+        if isinstance(out, np.ndarray):
+            if out.ndim == 1:
+                out = np.atleast_2d(out).T
+        return out
 
     def copy(self):
         """create a copy of the current object."""
