@@ -115,7 +115,6 @@ class Participant:
         self.set_recording_date(recording_date)
     
     def set_recording_date(self,
-        self,
         recording_date: date | None,
     ):
         """
