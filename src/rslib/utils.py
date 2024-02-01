@@ -69,8 +69,11 @@ class Participant:
     age: int | float | None = None
         the participant age
 
-    birth_date: date | None = None
+    birthdate: date | None = None
         the participant birth data
+
+    recordingdate: date | None = None
+        the the test recording date
     """
 
     # class variables
@@ -79,8 +82,8 @@ class Participant:
     _gender = None
     _height = None
     _weight = None
-    _birth_date = None
-    _recording_date = date  # type:ignore
+    _birthdate = None
+    _recordingdate = date  # type:ignore
     _units = {
         "fullname": "",
         "surname": "",
@@ -92,6 +95,7 @@ class Participant:
         "birthdate": "",
         "age": "years",
         "hrmax": "bpm",
+        "recordingdate": "",
     }
 
     def __init__(
@@ -102,8 +106,8 @@ class Participant:
         height: int | float | None = None,
         weight: int | float | None = None,
         age: int | float | None = None,
-        birth_date: date | None = None,
-        recording_date: date = datetime.now().date,  # type: ignore
+        birthdate: date | None = None,
+        recordingdate: date = datetime.now().date,  # type: ignore
     ):
         self.set_surname(surname)
         self.set_name(name)
@@ -111,11 +115,12 @@ class Participant:
         self.set_height((height / 100 if height is not None else height))
         self.set_weight(weight)
         self.set_age(age)
-        self.set_birthdate(birth_date)
-        self.set_recording_date(recording_date)
-    
-    def set_recording_date(self,
-        recording_date: date | None,
+        self.set_birthdate(birthdate)
+        self.set_recordingdate(recordingdate)
+
+    def set_recordingdate(
+        self,
+        recordingdate: date | None,
     ):
         """
         set the test recording date.
@@ -125,15 +130,15 @@ class Participant:
         recording_date: datetime.date | None
             the test recording date.
         """
-        if recording_date is not None:
-            txt = "'recording_date' must be a datetime.date or datetime.datetime."
-            assert isinstance(birth_date, (datetime, date)), txt
-            if isinstance(recording_date, datetime):
-                self._recording_date = recording_date.date()
+        if recordingdate is not None:
+            txt = "'recordingdate' must be a datetime.date or datetime.datetime."
+            assert isinstance(recordingdate, (datetime, date)), txt
+            if isinstance(recordingdate, datetime):
+                self._recordingdate = recordingdate.date()
             else:
-                self._recording_date = recording_date
+                self._recordingdate = recordingdate
         else:
-            self._recording_date = recording_date
+            self._recordingdate = recordingdate
 
     def set_surname(
         self,
@@ -237,7 +242,7 @@ class Participant:
 
     def set_birthdate(
         self,
-        birth_date: date | None,
+        birthdate: date | None,
     ):
         """
         set the participant birth_date.
@@ -247,15 +252,15 @@ class Participant:
         birth_date: datetime.date | None
             the birth date of the participant.
         """
-        if birth_date is not None:
+        if birthdate is not None:
             txt = "'birth_date' must be a datetime.date or datetime.datetime."
-            assert isinstance(birth_date, (datetime, date)), txt
-            if isinstance(birth_date, datetime):
-                self._birth_date = birth_date.date()
+            assert isinstance(birthdate, (datetime, date)), txt
+            if isinstance(birthdate, datetime):
+                self._birthdate = birthdate.date()
             else:
-                self._birth_date = birth_date
+                self._birthdate = birthdate
         else:
-            self._birth_date = birth_date
+            self._birthdate = birthdate
 
     @property
     def surname(self):
@@ -283,14 +288,14 @@ class Participant:
         return self._weight
 
     @property
-    def birth_date(self):
+    def birthdate(self):
         """get the participant birth date"""
-        return self._birth_date
+        return self._birthdate
 
     @property
-    def recording_date(self):
+    def recordingdate(self):
         """get the test recording date"""
-        return self._recording_date
+        return self._recordingdate
 
     @property
     def bmi(self):
@@ -313,8 +318,8 @@ class Participant:
         """
         if self._age is not None:
             return self._age
-        if self._birth_date is not None:
-            return int((self._recording_date - self._birth_date).days // 365)  # type: ignore
+        if self._birthdate is not None:
+            return int((self._recordingdate - self._birthdate).days // 365)  # type: ignore
         return None
 
     @property

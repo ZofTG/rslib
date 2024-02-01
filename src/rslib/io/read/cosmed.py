@@ -66,8 +66,8 @@ def _get_participant(
         gender=gender,
         height=height,
         weight=weight,
-        birth_date=birth_date,
-        recording_date=test_date,
+        birthdate=birth_date,
+        recordingdate=test_date,
     )
 
 
