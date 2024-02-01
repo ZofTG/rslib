@@ -112,7 +112,29 @@ class Participant:
         self.set_weight(weight)
         self.set_age(age)
         self.set_birthdate(birth_date)
-        self._recording_date = recording_date
+        self.set_recording_date(recording_date)
+    
+    def set_recording_date(self,
+        self,
+        recording_date: date | None,
+    ):
+        """
+        set the test recording date.
+
+        Parameters
+        ----------
+        recording_date: datetime.date | None
+            the test recording date.
+        """
+        if recording_date is not None:
+            txt = "'recording_date' must be a datetime.date or datetime.datetime."
+            assert isinstance(birth_date, (datetime, date)), txt
+            if isinstance(recording_date, datetime):
+                self._recording_date = recording_date.date()
+            else:
+                self._recording_date = recording_date
+        else:
+            self._recording_date = recording_date
 
     def set_surname(
         self,
@@ -227,7 +249,7 @@ class Participant:
             the birth date of the participant.
         """
         if birth_date is not None:
-            txt = "'BirthDate' must be a datetime.date or datetime.datetime."
+            txt = "'birth_date' must be a datetime.date or datetime.datetime."
             assert isinstance(birth_date, (datetime, date)), txt
             if isinstance(birth_date, datetime):
                 self._birth_date = birth_date.date()
@@ -262,9 +284,14 @@ class Participant:
         return self._weight
 
     @property
-    def birthdate(self):
+    def birth_date(self):
         """get the participant birth date"""
         return self._birth_date
+
+    @property
+    def recording_date(self):
+        """get the test recording date"""
+        return self._recording_date
 
     @property
     def bmi(self):
